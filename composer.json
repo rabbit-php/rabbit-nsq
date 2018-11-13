@@ -1,0 +1,22 @@
+{
+  "name": "rabbit/nsq",
+  "description": "rabbit nsq",
+  "type": "library",
+  "require": {
+    "rabbit/framework": "dev-master",
+    "rabbit/pool": "dev-master",
+    "rabbit/socket": "dev-master"
+  },
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "albert",
+      "email": "63851587@qq.com"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "rabbit\\nsq\\": "src/"
+    }
+  }
+}
