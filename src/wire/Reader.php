@@ -10,7 +10,6 @@ namespace rabbit\nsq\wire;
 
 use rabbit\nsq\message\Message;
 use rabbit\nsq\utility\IntPacker;
-use rabbit\pool\ConnectionInterface;
 
 /**
  * Class Reader
@@ -28,9 +27,13 @@ class Reader
     /** @var array */
     private $frame;
 
-    public function __construct(ConnectionInterface $connection, float $timeout = -1)
+    /**
+     * Reader constructor.
+     * @param string $body
+     */
+    public function __construct(string $body)
     {
-        $this->body = $connection->receive($timeout);
+        $this->body = $body;
     }
 
     /**
@@ -51,6 +54,7 @@ class Reader
             "size" => $size,
             "type" => $type,
         ];
+
         try {
             if (self::TYPE_RESPONSE == $type) {
                 $frame["response"] = $this->readString($size - 4);
@@ -126,8 +130,11 @@ class Reader
      */
     private function readInt(int $size): int
     {
-        list(, $tmp) = unpack("N", $this->read($size));
-        return sprintf("%u", $tmp);
+        list(, $res) = unpack('N', $this->read($size));
+        if ((PHP_INT_SIZE !== 4)) {
+            $res = sprintf("%u", $res);
+        }
+        return (int)$res;
     }
 
     /**

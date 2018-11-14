@@ -9,21 +9,21 @@
 namespace rabbit\nsq\pool;
 
 
+use rabbit\nsq\Tcp;
 use rabbit\pool\ConnectionInterface;
-use rabbit\pool\ConnectionPool;
-use rabbit\socket\TcpClient;
+use rabbit\socket\pool\SocketPool;
 
 /**
  * Class NsqPool
  * @package rabbit\nsq\pool
  */
-class NsqPool extends ConnectionPool
+class NsqPool extends SocketPool
 {
     /**
      * @return ConnectionInterface
      */
     public function createConnection(): ConnectionInterface
     {
-        return new TcpClient($this);
+        return new Tcp($this);
     }
 }

@@ -8,7 +8,6 @@
 
 namespace rabbit\nsq\wire;
 
-use rabbit\nsq\message\Message;
 use rabbit\nsq\utility\IntPacker;
 
 /**

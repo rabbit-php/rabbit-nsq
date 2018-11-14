@@ -19,6 +19,7 @@ class Message
     private $attempts;
     /** @var string */
     private $nsqdAddr;
+    /** @var string */
     private $delegate;
 
     /**
@@ -97,16 +98,16 @@ class Message
     public function setTimestamp(float $timestamp = null): self
     {
         if (null === $timestamp) {
-            $this->timestamp = microtime(true);
+            $this->timestamp = floor(microtime(true) * 1000);
         }
-        $this->timestamp = $timestamp;
+        $this->timestamp = floor($timestamp * 1000);
         return $this;
     }
 
     /**
      * @return int
      */
-    public function getAttempts():int
+    public function getAttempts(): int
     {
         return $this->attempts;
     }
@@ -124,7 +125,7 @@ class Message
     /**
      * @return string
      */
-    public function getNsqdAddr():string
+    public function getNsqdAddr(): string
     {
         return $this->nsqdAddr;
     }
@@ -133,24 +134,25 @@ class Message
      * @param string $nsqdAddr
      * @return Message
      */
-    public function setNsqdAddr(string $nsqdAddr):self
+    public function setNsqdAddr(string $nsqdAddr): self
     {
         $this->nsqdAddr = $nsqdAddr;
         return $this;
     }
 
     /**
-     * @return mixed
+     * @return string
      */
-    public function getDelegate()
+    public function getDelegate():string
     {
         return $this->delegate;
     }
 
     /**
-     * @param mixed $delegate
+     * @param string $delegate
+     * @return Message
      */
-    public function setDelegate($delegate)
+    public function setDelegate(string $delegate): self
     {
         $this->delegate = $delegate;
         return $this;
