@@ -1,11 +1,15 @@
 <?php
 
 namespace rabbit\nsq\message;
+
+use rabbit\contract\Arrayable;
+use rabbit\helper\JsonHelper;
+
 /**
  * Class Message
  * @package rabbit\message
  */
-class Message
+class Message implements Arrayable
 {
     /** @var bool */
     private $decoded = false;
@@ -143,7 +147,7 @@ class Message
     /**
      * @return string
      */
-    public function getDelegate():string
+    public function getDelegate(): string
     {
         return $this->delegate;
     }
@@ -156,5 +160,13 @@ class Message
     {
         $this->delegate = $delegate;
         return $this;
+    }
+
+    /**
+     * @return array
+     */
+    public function toArray(): array
+    {
+        return JsonHelper::decode($this->body, true);
     }
 }
