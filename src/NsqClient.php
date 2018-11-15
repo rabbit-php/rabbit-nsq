@@ -44,43 +44,34 @@ class NsqClient
     }
 
     /**
+     * @param string $topic
      * @param string $message
+     * @return NsqResult
      * @throws \Exception
      */
-    public function publish(string $topic, string $message): void
+    public function publish(string $topic, string $message): NsqResult
     {
         try {
             $connection = $this->pool->getConnection();
-            $connection->send(Writer::pub($topic, $message));
+            $result = $connection->send(Writer::pub($topic, $message));
+            return new NsqResult($connection, $result);
         } catch (Exception $e) {
             App::error("publish error=" . (string)$e, $this->module);
         }
     }
 
     /**
+     * @param string $topic
      * @param mixed ...$bodies
+     * @return NsqResult
      * @throws \Exception
      */
-    public function publishMulti(string $topic, ...$bodies): void
+    public function publishMulti(string $topic, ...$bodies): NsqResult
     {
         try {
             $connection = $this->pool->getConnection();
-            $connection->send(Writer::mpub($topic, $bodies));
-        } catch (\Exception $e) {
-            App::error("publish error=" . (string)$e, $this->module);
-        }
-    }
-
-    /**
-     * @param string $message
-     * @param int $deferTime
-     * @throws \Exception
-     */
-    public function publishDefer(string $topic, string $message, int $deferTime): void
-    {
-        try {
-            $connection = $this->pool->getConnection();
-            $connection->send(Writer::dpub($topic, $deferTime, $message));
+            $result = $connection->send(Writer::mpub($topic, $bodies));
+            return new NsqResult($connection, $result);
         } catch (\Exception $e) {
             App::error("publish error=" . (string)$e, $this->module);
         }
@@ -88,6 +79,25 @@ class NsqClient
 
     /**
      * @param string $topic
+     * @param string $message
+     * @param int $deferTime
+     * @return NsqResult
+     * @throws \Exception
+     */
+    public function publishDefer(string $topic, string $message, int $deferTime): NsqResult
+    {
+        try {
+            $connection = $this->pool->getConnection();
+            $result = $connection->send(Writer::dpub($topic, $deferTime, $message));
+            return new NsqResult($connection, $result);
+        } catch (\Exception $e) {
+            App::error("publish error=" . (string)$e, $this->module);
+        }
+    }
+
+    /**
+     * @param string $topic
+     * @param string $channel
      * @param array $config
      * @param \Closure $callback
      * @throws \Exception
