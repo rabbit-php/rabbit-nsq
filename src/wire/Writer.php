@@ -8,6 +8,7 @@
 
 namespace rabbit\nsq\wire;
 
+use rabbit\helper\JsonHelper;
 use rabbit\nsq\utility\IntPacker;
 
 /**
@@ -27,16 +28,20 @@ class Writer
     }
 
     /**
+     * @param array $json
      * @return string
      */
-    public static function identify(): string
+    public static function identify(array $json): string
     {
-        return self::command("IDENTIFY");
+        $json = JsonHelper::encode($json);
+        $cmd = self::command("IDENTIFY");
+        $size = IntPacker::uInt32(strlen($json), true);
+        return $cmd . $size . $json;
     }
 
     /**
-     * @param $topic
-     * @param $body
+     * @param string $topic
+     * @param string $body
      * @return string
      */
     public static function pub(string $topic, string $body): string
@@ -47,7 +52,7 @@ class Writer
     }
 
     /**
-     * @param $topic
+     * @param string $topic
      * @param array $bodies
      * @return string
      */
@@ -63,9 +68,9 @@ class Writer
     }
 
     /**
-     * @param $topic
-     * @param $deferTime
-     * @param $body
+     * @param string $topic
+     * @param int $deferTime
+     * @param string $body
      * @return string
      */
     public static function dpub(string $topic, int $deferTime, string $body): string
@@ -76,17 +81,17 @@ class Writer
     }
 
     /**
-     * @param $topic
-     * @param $channel
+     * @param string $topic
+     * @param string $channel
      * @return string
      */
-    public static function sub($topic, $channel): string
+    public static function sub(string $topic, string $channel): string
     {
         return self::command("SUB", $topic, $channel);
     }
 
     /**
-     * @param $count
+     * @param int $count
      * @return string
      */
     public static function rdy(int $count): string
@@ -95,25 +100,25 @@ class Writer
     }
 
     /**
-     * @param $id
+     * @param string $id
      * @return string
      */
-    public static function fin($id): string
+    public static function fin(string $id): string
     {
         return self::command("FIN", $id);
     }
 
     /**
-     * @param $id
-     * @param $timeout
+     * @param string $id
+     * @param int $timeout
      * @return string
      */
-    public static function req($id, int $timeout): string
+    public static function req(string $id, int $timeout): string
     {
         return self::command("REQ", $id, $timeout);
     }
 
-    public static function touch($id): string
+    public static function touch(string $id): string
     {
         return self::command("TOUCH", $id);
     }
@@ -135,14 +140,15 @@ class Writer
     }
 
     /**
-     * @param $secret
+     * @param array $json
      * @return string
      */
-    public static function auth($secret): string
+    public static function auth(array $json): string
     {
+        $json = JsonHelper::encode($json);
         $cmd = self::command("AUTH");
-        $size = IntPacker::uInt32(strlen($secret), true);
-        return $cmd . $size . $secret;
+        $size = IntPacker::uInt32(strlen($json), true);
+        return $cmd . $size . $json;
     }
 
     /**

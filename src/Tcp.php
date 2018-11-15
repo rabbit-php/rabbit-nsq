@@ -9,6 +9,8 @@
 namespace rabbit\nsq;
 
 
+use rabbit\App;
+use rabbit\nsq\wire\Reader;
 use rabbit\nsq\wire\Writer;
 use rabbit\pool\PoolInterface;
 use rabbit\socket\TcpClient;
@@ -26,6 +28,13 @@ class Tcp extends TcpClient
     public function __construct(PoolInterface $connectPool)
     {
         parent::__construct($connectPool);
-        $this->send(Writer::MAGIC_V2);
+        $this->connection->send(Writer::MAGIC_V2);
+        //禁用心跳
+        $this->connection->send(Writer::identify(["heartbeat_interval" => -1]));
+        $result = $this->connection->recv($this->pool->getTimeout());
+        $reader = (new Reader($result))->bindFrame();
+        if (!$reader->isOk()) {
+            throw new \RuntimeException('set identify error');
+        }
     }
 }
