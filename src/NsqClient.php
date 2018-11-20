@@ -111,7 +111,9 @@ class NsqClient
                 $cli->send(Writer::sub($topic, $channel));
                 $cli->send(Writer::rdy($config['rdy'] ?? 1));
             })->on('receive', function (\Swoole\Client $cli, string $body) use ($config, $callback) {
-                $this->handleMessage($cli, $body, $config, $callback);
+                go(function () use ($cli, $body, $config, $callback) {
+                    $this->handleMessage($cli, $body, $config, $callback);
+                });
             })->createConnection($topicChannel);
         } catch (\Exception $e) {
             App::error("subscribe error=" . (string)$e, $this->module);

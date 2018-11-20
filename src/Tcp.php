@@ -9,7 +9,6 @@
 namespace rabbit\nsq;
 
 
-use rabbit\App;
 use rabbit\nsq\wire\Reader;
 use rabbit\nsq\wire\Writer;
 use rabbit\pool\PoolInterface;
