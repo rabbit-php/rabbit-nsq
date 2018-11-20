@@ -13,7 +13,7 @@ use rabbit\nsq\pool\AsyncNsqPool;
 use rabbit\nsq\pool\NsqPool;
 use rabbit\nsq\wire\Reader;
 use rabbit\nsq\wire\Writer;
-use rabbit\socket\AsyncTcp;
+use rabbit\socket\tcp\AsyncTcp;
 
 /**
  * Class NsqClient

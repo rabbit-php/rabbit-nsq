@@ -11,13 +11,13 @@ namespace rabbit\nsq\pool;
 
 use rabbit\nsq\Tcp;
 use rabbit\pool\ConnectionInterface;
-use rabbit\socket\pool\SocketPool;
+use rabbit\socket\pool\TcpPool;
 
 /**
  * Class NsqPool
  * @package rabbit\nsq\pool
  */
-class NsqPool extends SocketPool
+class NsqPool extends TcpPool
 {
     /**
      * @return ConnectionInterface
