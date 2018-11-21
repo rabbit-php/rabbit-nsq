@@ -19,11 +19,20 @@ use rabbit\socket\pool\TcpPool;
  */
 class NsqPool extends TcpPool
 {
+    private $isHeartbeat = false;
+
     /**
      * @return ConnectionInterface
      */
     public function createConnection(): ConnectionInterface
     {
         return new Tcp($this);
+    }
+
+    /**
+     * @return bool
+     */
+    public function getHeartbeat():bool {
+        return $this->isHeartbeat;
     }
 }

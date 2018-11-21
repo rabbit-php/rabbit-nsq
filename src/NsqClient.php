@@ -22,11 +22,9 @@ use rabbit\socket\tcp\AsyncTcp;
 class NsqClient
 {
     /** @var NsqPool */
-    private $pool;
-
-    /** @var AsyncTcp */
-    private $asyncTcp;
-
+    private $pubPool;
+    /** @var NsqPool */
+    private $subPool;
     /**
      * @var string
      */
@@ -37,10 +35,10 @@ class NsqClient
      * @param NsqPool $productPool
      * @param AsyncNsqPool $consumerPool
      */
-    public function __construct(NsqPool $pool, AsyncTcp $asyncTcp)
+    public function __construct(NsqPool $pubPool, NsqPool $subPool)
     {
-        $this->pool = $pool;
-        $this->asyncTcp = $asyncTcp;
+        $this->pubPool = $pubPool;
+        $this->subPool = $subPool;
     }
 
     /**
@@ -52,7 +50,7 @@ class NsqClient
     public function publish(string $topic, string $message): NsqResult
     {
         try {
-            $connection = $this->pool->getConnection();
+            $connection = $this->pubPool->getConnection();
             $result = $connection->send(Writer::pub($topic, $message));
             return new NsqResult($connection, $result);
         } catch (Exception $e) {
@@ -69,7 +67,7 @@ class NsqClient
     public function publishMulti(string $topic, ...$bodies): NsqResult
     {
         try {
-            $connection = $this->pool->getConnection();
+            $connection = $this->pubPool->getConnection();
             $result = $connection->send(Writer::mpub($topic, $bodies));
             return new NsqResult($connection, $result);
         } catch (\Exception $e) {
@@ -87,7 +85,7 @@ class NsqClient
     public function publishDefer(string $topic, string $message, int $deferTime): NsqResult
     {
         try {
-            $connection = $this->pool->getConnection();
+            $connection = $this->pubPool->getConnection();
             $result = $connection->send(Writer::dpub($topic, $deferTime, $message));
             return new NsqResult($connection, $result);
         } catch (\Exception $e) {
@@ -105,16 +103,21 @@ class NsqClient
     public function subscribe(string $topic, string $channel, array $config, \Closure $callback): void
     {
         try {
-            $topicChannel = implode(':', [$topic, $channel]);
-            $this->asyncTcp->on('connect', function (\Swoole\Client $cli) use ($topic, $channel, $config) {
-                $cli->send(Writer::MAGIC_V2);
-                $cli->send(Writer::sub($topic, $channel));
-                $cli->send(Writer::rdy($config['rdy'] ?? 1));
-            })->on('receive', function (\Swoole\Client $cli, string $body) use ($config, $callback) {
-                go(function () use ($cli, $body, $config, $callback) {
-                    $this->handleMessage($cli, $body, $config, $callback);
+            /** @var NsqPool $pool */
+            $pool = $config['pool'];
+            unset($config['pool']);
+            /** @var Tcp $connection */
+            for ($i = 0; $i < $pool->getPoolConfig()->getMinActive(); $i++) {
+                $connection = $pool->getConnection();
+                go(function () use ($connection, $config, $callback) {
+                    while (true) {
+                        $reader = (new Reader($connection->receive()))->bindFrame();
+                        $this->handleMessage($connection, $reader, $config, $callback);
+                    }
                 });
-            })->createConnection($topicChannel);
+                $connection->send(Writer::sub($topic, $channel));
+                $connection->send(Writer::rdy($config['rdy'] ?? 1));
+            }
         } catch (\Exception $e) {
             App::error("subscribe error=" . (string)$e, $this->module);
         }
@@ -127,9 +130,8 @@ class NsqClient
      * @param \Closure $callback
      * @throws \Exception
      */
-    private function handleMessage(\Swoole\Client $connection, string $body, array $config, \Closure $callback): void
+    private function handleMessage(Tcp $connection, Reader $reader, array $config, \Closure $callback): void
     {
-        $reader = (new Reader($body))->bindFrame();
         if ($reader->isHeartbeat()) {
             $connection->send(Writer::nop());
         } elseif ($reader->isMessage()) {

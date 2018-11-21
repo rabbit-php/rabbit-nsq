@@ -28,12 +28,15 @@ class Tcp extends TcpClient
     {
         parent::__construct($connectPool);
         $this->connection->send(Writer::MAGIC_V2);
-        //禁用心跳
-        $this->connection->send(Writer::identify(["heartbeat_interval" => -1]));
-        $result = $this->connection->recv($this->pool->getTimeout());
-        $reader = (new Reader($result))->bindFrame();
-        if (!$reader->isOk()) {
-            throw new \RuntimeException('set identify error');
+
+        if (!$connectPool->getHeartbeat()) {
+            //禁用心跳
+            $this->connection->send(Writer::identify(["heartbeat_interval" => -1]));
+            $result = $this->connection->recv($this->pool->getTimeout());
+            $reader = (new Reader($result))->bindFrame();
+            if (!$reader->isOk()) {
+                throw new \RuntimeException('set identify error');
+            }
         }
     }
 }
