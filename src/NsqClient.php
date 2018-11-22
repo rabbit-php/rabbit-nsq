@@ -22,9 +22,7 @@ use rabbit\socket\tcp\AsyncTcp;
 class NsqClient
 {
     /** @var NsqPool */
-    private $pubPool;
-    /** @var NsqPool */
-    private $subPool;
+    private $pool;
     /**
      * @var string
      */
@@ -35,10 +33,9 @@ class NsqClient
      * @param NsqPool $productPool
      * @param AsyncNsqPool $consumerPool
      */
-    public function __construct(NsqPool $pubPool, NsqPool $subPool)
+    public function __construct(NsqPool $pool)
     {
-        $this->pubPool = $pubPool;
-        $this->subPool = $subPool;
+        $this->pool = $pool;
     }
 
     /**
@@ -50,7 +47,7 @@ class NsqClient
     public function publish(string $topic, string $message): NsqResult
     {
         try {
-            $connection = $this->pubPool->getConnection();
+            $connection = $this->pool->getConnection();
             $result = $connection->send(Writer::pub($topic, $message));
             return new NsqResult($connection, $result);
         } catch (Exception $e) {
@@ -67,7 +64,7 @@ class NsqClient
     public function publishMulti(string $topic, ...$bodies): NsqResult
     {
         try {
-            $connection = $this->pubPool->getConnection();
+            $connection = $this->pool->getConnection();
             $result = $connection->send(Writer::mpub($topic, $bodies));
             return new NsqResult($connection, $result);
         } catch (\Exception $e) {
@@ -85,7 +82,7 @@ class NsqClient
     public function publishDefer(string $topic, string $message, int $deferTime): NsqResult
     {
         try {
-            $connection = $this->pubPool->getConnection();
+            $connection = $this->pool->getConnection();
             $result = $connection->send(Writer::dpub($topic, $deferTime, $message));
             return new NsqResult($connection, $result);
         } catch (\Exception $e) {
