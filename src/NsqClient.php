@@ -13,7 +13,8 @@ use rabbit\nsq\pool\AsyncNsqPool;
 use rabbit\nsq\pool\NsqPool;
 use rabbit\nsq\wire\Reader;
 use rabbit\nsq\wire\Writer;
-use rabbit\socket\tcp\AsyncTcp;
+use rabbit\pool\ConnectionPool;
+use rabbit\socket\SocketClient;
 
 /**
  * Class NsqClient
@@ -30,10 +31,9 @@ class NsqClient
 
     /**
      * NsqClient constructor.
-     * @param NsqPool $productPool
-     * @param AsyncNsqPool $consumerPool
+     * @param ConnectionPool $pool
      */
-    public function __construct(NsqPool $pool)
+    public function __construct(ConnectionPool $pool)
     {
         $this->pool = $pool;
     }
@@ -108,8 +108,7 @@ class NsqClient
                 $connection = $pool->getConnection();
                 go(function () use ($connection, $config, $callback) {
                     while (true) {
-                        $reader = (new Reader($connection->receive()))->bindFrame();
-                        $this->handleMessage($connection, $reader, $config, $callback);
+                        $this->handleMessage($connection, $config, $callback);
                     }
                 });
                 $connection->send(Writer::sub($topic, $channel));
@@ -127,12 +126,13 @@ class NsqClient
      * @param \Closure $callback
      * @throws \Exception
      */
-    private function handleMessage(Tcp $connection, Reader $reader, array $config, \Closure $callback): void
+    private function handleMessage(SocketClient $connection, array $config, \Closure $callback): void
     {
+        $reader = (new Reader(-1))->bindFrame($connection);
         if ($reader->isHeartbeat()) {
             $connection->send(Writer::nop());
         } elseif ($reader->isMessage()) {
-            $msg = $reader->getMessage();
+            $msg = $reader->getMessage($connection);
             try {
                 call_user_func($callback, $msg);
             } catch (\Exception $e) {
@@ -148,7 +148,7 @@ class NsqClient
         } elseif ($reader->isOk()) {
             App::info('Ignoring "OK" frame in SUB loop', $this->module);
         } else {
-            App::error("Error/unexpected frame received: =" . $reader->getMessage(), $this->module);
+            App::error("Error/unexpected frame received: =" . $reader->getMessage($connection), $this->module);
         }
     }
 }

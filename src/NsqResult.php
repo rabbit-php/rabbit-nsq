@@ -25,8 +25,8 @@ class NsqResult extends AbstractResult
     public function getResult(...$params)
     {
         $timeout = array_shift($params);
-
-        $result = $this->recv(true, $timeout ?? -1);
-        return (new Reader($result))->bindFrame();
+        $reader = (new Reader($timeout))->bindFrame($this->connection);
+        $this->connection->release();
+        return $reader;
     }
 }
