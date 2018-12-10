@@ -57,15 +57,18 @@ class Reader
             "type" => $type,
         ];
 
-        try {
-            if (self::TYPE_RESPONSE == $type) {
-                $frame["response"] = $this->readString($reader, $size - 4);
-            } elseif (self::TYPE_ERROR == $type) {
-                $frame["error"] = $this->readString($reader, $size - 4);
+        if ($size !== 0) {
+            try {
+                if (self::TYPE_RESPONSE == $type) {
+                    $frame["response"] = $this->readString($reader, $size - 4);
+                } elseif (self::TYPE_ERROR == $type) {
+                    $frame["error"] = $this->readString($reader, $size - 4);
+                }
+            } catch (\Exception $e) {
+                App::error($e->getMessage(), 'nsq');
             }
-        } catch (\Exception $e) {
-            App::error($e->getMessage(), 'nsq');
         }
+
         $this->frame = $frame;
         return $this;
     }
