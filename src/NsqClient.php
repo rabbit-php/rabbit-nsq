@@ -57,11 +57,11 @@ class NsqClient
 
     /**
      * @param string $topic
-     * @param mixed ...$bodies
+     * @param array $bodies
      * @return NsqResult
      * @throws \Exception
      */
-    public function publishMulti(string $topic, ...$bodies): NsqResult
+    public function publishMulti(string $topic, array $bodies): NsqResult
     {
         try {
             $connection = $this->pool->getConnection();
