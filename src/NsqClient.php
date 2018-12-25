@@ -106,13 +106,13 @@ class NsqClient
             /** @var Tcp $connection */
             for ($i = 0; $i < $pool->getPoolConfig()->getMinActive(); $i++) {
                 $connection = $pool->getConnection();
-                go(function () use ($connection, $config, $callback) {
+                go(function () use ($connection, $config, $callback, $topic, $channel) {
+                    $connection->send(Writer::sub($topic, $channel));
+                    $connection->send(Writer::rdy($config['rdy'] ?? 1));
                     while (true) {
                         $this->handleMessage($connection, $config, $callback);
                     }
                 });
-                $connection->send(Writer::sub($topic, $channel));
-                $connection->send(Writer::rdy($config['rdy'] ?? 1));
             }
         } catch (\Exception $e) {
             App::error("subscribe error=" . (string)$e, $this->module);
