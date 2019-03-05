@@ -44,23 +44,25 @@ class NsqProcess extends AbstractProcess
                 [$topic, $channel] = explode(':', $topicChannel);
                 $handler = $config['handler'];
                 unset($config['handler']);
-                $getTopic = true;
-                while ($getTopic) {
-                    /** @var Response $response */
-                    $response = $this->httpClient->get('/lookup', ['uri_query' => ['topic' => $topic]]);
-                    if ($response->success) {
-                        $data = $response->getParsedJsonArray();
-                        foreach ($data['channels'] as $chl) {
-                            if ($chl === $channel && $data['producers']) {
-                                $product = current($data['producers']);
-                                $uri = explode(':', $product['remote_address'])[0];
-                                $port = $product['tcp_port'];
-                                $config['pool']->getPoolConfig()->setUri([$uri . ':' . $port]);
-                                $getTopic = false;
+                if (empty($config['pool']->getPoolConfig()->getUri())) {
+                    $getTopic = true;
+                    while ($getTopic) {
+                        /** @var Response $response */
+                        $response = $this->httpClient->get('/lookup', ['uri_query' => ['topic' => $topic]]);
+                        if ($response->success) {
+                            $data = $response->getParsedJsonArray();
+                            foreach ($data['channels'] as $chl) {
+                                if ($chl === $channel && $data['producers']) {
+                                    $product = current($data['producers']);
+                                    $uri = explode(':', $product['remote_address'])[0];
+                                    $port = $product['tcp_port'];
+                                    $config['pool']->getPoolConfig()->setUri([$uri . ':' . $port]);
+                                    $getTopic = false;
+                                }
                             }
                         }
+                        CoroHelper::sleep(1);
                     }
-                    CoroHelper::sleep(1);
                 }
                 $this->nsq->subscribe($topic, $channel, $config, function (Message $msg) use ($handler) {
                     getDI($handler)->handle($msg);
