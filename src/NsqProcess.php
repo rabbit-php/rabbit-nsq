@@ -44,11 +44,13 @@ class NsqProcess extends AbstractProcess
                 [$topic, $channel] = explode(':', $topicChannel);
                 $handler = $config['handler'];
                 unset($config['handler']);
+                $config['pool'] = clone $config['pool'];
+                $config['pool']->getPoolConfig()->setName('nsq:' . $topicChannel);
                 if (empty($config['pool']->getPoolConfig()->getUri())) {
                     $getTopic = true;
                     while ($getTopic) {
                         /** @var Response $response */
-                        $response = $this->httpClient->get('/lookup', ['uri_query' => ['topic' => $topic]]);
+                        $response = $this->httpClient->get(getDI('nsq.uri') . '/lookup', ['uri_query' => ['topic' => $topic]]);
                         if ($response->success) {
                             $data = $response->getParsedJsonArray();
                             foreach ($data['channels'] as $chl) {
