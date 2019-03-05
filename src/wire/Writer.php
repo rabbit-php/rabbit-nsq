@@ -40,6 +40,16 @@ class Writer
     }
 
     /**
+     * @param $action
+     * @param mixed ...$params
+     * @return string
+     */
+    private static function command($action, ...$params): string
+    {
+        return sprintf("%s %s%s", $action, implode(' ', $params), "\n");
+    }
+
+    /**
      * @param string $topic
      * @param string $body
      * @return string
@@ -149,15 +159,5 @@ class Writer
         $cmd = self::command("AUTH");
         $size = IntPacker::uInt32(strlen($json), true);
         return $cmd . $size . $json;
-    }
-
-    /**
-     * @param $action
-     * @param mixed ...$params
-     * @return string
-     */
-    private static function command($action, ...$params): string
-    {
-        return sprintf("%s %s%s", $action, implode(' ', $params), "\n");
     }
 }

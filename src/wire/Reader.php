@@ -82,52 +82,6 @@ class Reader
     //                         (uint16)
     //                          2-byte
     //                         attempts
-    public function getMessage(SocketClient $reader): ?Message
-    {
-        if (null !== $this->frame && self::TYPE_MESSAGE == $this->frame["type"]) {
-            return (new Message())->setTimestamp($this->readInt64($reader, 8))
-                ->setAttempts($this->readUInt16($reader, 2))
-                ->setId($this->readString($reader, 16))
-                ->setBody($this->readString($reader, $this->frame["size"] - 30))
-                ->setDecoded();
-        }
-        return null;
-    }
-
-    /**
-     * @return bool
-     */
-    public function isMessage(): bool
-    {
-        return self::TYPE_MESSAGE == $this->frame["type"];
-    }
-
-    /**
-     * @return bool
-     */
-    public function isHeartbeat(): bool
-    {
-        return $this->isResponse(self::HEARTBEAT);
-    }
-
-    /**
-     * @return bool
-     */
-    public function isOk(): bool
-    {
-        return $this->isResponse(self::OK);
-    }
-
-    /**
-     * @param string|null $response
-     * @return bool
-     */
-    public function isResponse(string $response = null): bool
-    {
-        return isset($this->frame["response"])
-            && self::TYPE_RESPONSE == $this->frame["type"]
-            && (null === $response || $response === $this->frame["response"]);
-    }
 
     /**
      * @param $size
@@ -140,6 +94,37 @@ class Reader
             $res = sprintf("%u", $res);
         }
         return (int)$res;
+    }
+
+    /**
+     * @param int $size
+     * @return string
+     */
+    private function read(SocketClient $reader, int $size): string
+    {
+        return $reader->recv($size, $this->timeout ?? $reader->getPool()->getTimeout());
+    }
+
+    /**
+     * @param $size
+     * @return string
+     */
+    private function readString(SocketClient $reader, int $size): string
+    {
+        $bytes = unpack("c{$size}chars", $this->read($reader, $size));
+        return implode(array_map("chr", $bytes));
+    }
+
+    public function getMessage(SocketClient $reader): ?Message
+    {
+        if (null !== $this->frame && self::TYPE_MESSAGE == $this->frame["type"]) {
+            return (new Message())->setTimestamp($this->readInt64($reader, 8))
+                ->setAttempts($this->readUInt16($reader, 2))
+                ->setId($this->readString($reader, 16))
+                ->setBody($this->readString($reader, $this->frame["size"] - 30))
+                ->setDecoded();
+        }
+        return null;
     }
 
     /**
@@ -161,21 +146,37 @@ class Reader
     }
 
     /**
-     * @param $size
-     * @return string
+     * @return bool
      */
-    private function readString(SocketClient $reader, int $size): string
+    public function isMessage(): bool
     {
-        $bytes = unpack("c{$size}chars", $this->read($reader, $size));
-        return implode(array_map("chr", $bytes));
+        return self::TYPE_MESSAGE == $this->frame["type"];
     }
 
     /**
-     * @param int $size
-     * @return string
+     * @return bool
      */
-    private function read(SocketClient $reader, int $size): string
+    public function isHeartbeat(): bool
     {
-        return $reader->recv($size, $this->timeout ?? $reader->getPool()->getTimeout());
+        return $this->isResponse(self::HEARTBEAT);
+    }
+
+    /**
+     * @param string|null $response
+     * @return bool
+     */
+    public function isResponse(string $response = null): bool
+    {
+        return isset($this->frame["response"])
+            && self::TYPE_RESPONSE == $this->frame["type"]
+            && (null === $response || $response === $this->frame["response"]);
+    }
+
+    /**
+     * @return bool
+     */
+    public function isOk(): bool
+    {
+        return $this->isResponse(self::OK);
     }
 }

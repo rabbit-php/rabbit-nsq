@@ -9,11 +9,10 @@
 namespace rabbit\nsq;
 
 use rabbit\App;
-use rabbit\nsq\pool\AsyncNsqPool;
-use rabbit\nsq\pool\NsqPool;
 use rabbit\nsq\wire\Reader;
 use rabbit\nsq\wire\Writer;
 use rabbit\pool\ConnectionPool;
+use rabbit\socket\pool\SocketPool;
 use rabbit\socket\SocketClient;
 
 /**
@@ -100,10 +99,10 @@ class NsqClient
     public function subscribe(string $topic, string $channel, array $config, \Closure $callback): void
     {
         try {
-            /** @var NsqPool $pool */
+            /** @var SocketPool $pool */
             $pool = $config['pool'];
             unset($config['pool']);
-            /** @var Tcp $connection */
+            /** @var Consumer $connection */
             for ($i = 0; $i < $pool->getPoolConfig()->getMinActive(); $i++) {
                 $connection = $pool->getConnection();
                 go(function () use ($connection, $config, $callback, $topic, $channel) {

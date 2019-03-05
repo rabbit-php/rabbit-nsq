@@ -9,9 +9,12 @@
 namespace rabbit\nsq;
 
 
+use rabbit\helper\CoroHelper;
+use rabbit\httpclient\Client;
 use rabbit\nsq\message\Message;
 use rabbit\process\AbstractProcess;
 use rabbit\process\Process;
+use Swlib\Saber\Response;
 
 /**
  * Class NsqlProcess
@@ -26,6 +29,10 @@ class NsqProcess extends AbstractProcess
      * @var array
      */
     private $topics = [];
+    /**
+     * @var Client
+     */
+    private $httpClient;
 
     /**
      * @param Process $process
@@ -33,11 +40,31 @@ class NsqProcess extends AbstractProcess
     public function run(Process $process): void
     {
         foreach ($this->topics as $topicChannel => $config) {
-            [$topic, $channel] = explode(':', $topicChannel);
-            $handler = $config['handler'];
-            unset($config['handler']);
-            $this->nsq->subscribe($topic, $channel, $config, function (Message $msg) use ($handler) {
-                call_user_func([$handler, 'handle'], $msg);
+            CoroHelper::go(function () use ($topicChannel, $config) {
+                [$topic, $channel] = explode(':', $topicChannel);
+                $handler = $config['handler'];
+                unset($config['handler']);
+                $getTopic = true;
+                while ($getTopic) {
+                    /** @var Response $response */
+                    $response = $this->httpClient->get('/lookup', ['uri_query' => ['topic' => $topic]]);
+                    if ($response->success) {
+                        $data = $response->getParsedJsonArray();
+                        foreach ($data['channels'] as $chl) {
+                            if ($chl === $channel && $data['producers']) {
+                                $product = current($data['producers']);
+                                $uri = explode(':', $product['remote_address'])[0];
+                                $port = $product['tcp_port'];
+                                $config['pool']->getPoolConfig()->setUri([$uri . ':' . $port]);
+                                $getTopic = false;
+                            }
+                        }
+                    }
+                    CoroHelper::sleep(1);
+                }
+                $this->nsq->subscribe($topic, $channel, $config, function (Message $msg) use ($handler) {
+                    getDI($handler)->handle($msg);
+                });
             });
         }
     }
