@@ -9,6 +9,7 @@
 namespace rabbit\nsq;
 
 use rabbit\App;
+use rabbit\helper\CoroHelper;
 use rabbit\nsq\wire\Reader;
 use rabbit\nsq\wire\Writer;
 use rabbit\pool\ConnectionPool;
@@ -104,18 +105,35 @@ class NsqClient
             unset($config['pool']);
             /** @var Consumer $connection */
             for ($i = 0; $i < $pool->getPoolConfig()->getMinActive(); $i++) {
-                $connection = $pool->getConnection();
-                go(function () use ($connection, $config, $callback, $topic, $channel) {
-                    $connection->send(Writer::sub($topic, $channel));
-                    $connection->send(Writer::rdy($config['rdy'] ?? 1));
-                    while (true) {
-                        $this->handleMessage($connection, $config, $callback);
-                    }
-                });
+                $this->doRun($pool, $topic, $channel, $config, $callback);
             }
         } catch (\Exception $e) {
             App::error("subscribe error=" . (string)$e, $this->module);
         }
+    }
+
+    /**
+     * @param SocketPool $pool
+     * @param string $topic
+     * @param string $channel
+     * @param array $config
+     * @param \Closure $callback
+     */
+    private function doRun(SocketPool $pool, string $topic, string $channel, array $config, \Closure $callback): void
+    {
+        $connection = $pool->getConnection();
+        go(function () use ($pool, $connection, $config, $callback, $topic, $channel) {
+            $connection->send(Writer::sub($topic, $channel));
+            $connection->send(Writer::rdy($config['rdy'] ?? 1));
+            while (true) {
+                if (!$this->handleMessage($connection, $config, $callback)) {
+                    break;
+                }
+            }
+            CoroHelper::sleep($pool->getPoolConfig()->getMaxWaitTime());
+            $pool->setCurrentCount();
+            $this->doRun($pool, $topic, $channel, $config, $callback);
+        });
     }
 
     /**
@@ -125,9 +143,14 @@ class NsqClient
      * @param \Closure $callback
      * @throws \Exception
      */
-    private function handleMessage(SocketClient $connection, array $config, \Closure $callback): void
+    private function handleMessage(SocketClient $connection, array $config, \Closure $callback): bool
     {
-        $reader = (new Reader(-1))->bindFrame($connection);
+        try {
+            $reader = (new Reader(-1))->bindFrame($connection);
+        } catch (ConnectionException $throwable) {
+            return false;
+        }
+
         if ($reader->isHeartbeat()) {
             $connection->send(Writer::nop());
         } elseif ($reader->isMessage()) {
@@ -149,5 +172,6 @@ class NsqClient
         } else {
             App::error("Error/unexpected frame received: =" . $reader->getMessage($connection), $this->module);
         }
+        return true;
     }
 }

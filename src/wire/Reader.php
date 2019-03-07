@@ -9,6 +9,7 @@
 namespace rabbit\nsq\wire;
 
 use rabbit\App;
+use rabbit\nsq\ConnectionException;
 use rabbit\nsq\message\Message;
 use rabbit\nsq\utility\IntPacker;
 use rabbit\socket\SocketClient;
@@ -49,6 +50,8 @@ class Reader
         try {
             $size = $this->readInt($reader, 4);
             $type = $this->readInt($reader, 4);
+        } catch (ConnectionException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new \Exception("Error reading message frame [$size, $type] ({$e->getMessage()})");
         }
@@ -64,6 +67,8 @@ class Reader
                 } elseif (self::TYPE_ERROR == $type) {
                     $frame["error"] = $this->readString($reader, $size - 4);
                 }
+            } catch (ConnectionException $e) {
+                throw $e;
             } catch (\Exception $e) {
                 App::error($e->getMessage(), 'nsq');
             }
@@ -102,7 +107,11 @@ class Reader
      */
     private function read(SocketClient $reader, int $size): string
     {
-        return $reader->recv($size, $this->timeout ?? $reader->getPool()->getTimeout());
+        $data = $reader->recv($size, $this->timeout ?? $reader->getPool()->getTimeout());
+        if (empty($data)) {
+            throw new ConnectionException("recv empty data!");
+        }
+        return $data;
     }
 
     /**
