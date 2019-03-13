@@ -121,7 +121,15 @@ class NsqClient
      */
     private function doRun(SocketPool $pool, string $topic, string $channel, array $config, \Closure $callback): void
     {
-        $connection = $pool->getConnection();
+        try{
+            $connection = $pool->getConnection();
+        }catch (\Throwable $throwable){
+            App::error($throwable->getMessage());
+            CoroHelper::sleep($pool->getPoolConfig()->getMaxWaitTime());
+            $pool->setCurrentCount();
+            $this->doRun($pool, $topic, $channel, $config, $callback);
+        }
+
         go(function () use ($pool, $connection, $config, $callback, $topic, $channel) {
             $connection->send(Writer::sub($topic, $channel));
             $connection->send(Writer::rdy($config['rdy'] ?? 1));
