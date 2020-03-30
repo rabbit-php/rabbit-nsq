@@ -36,6 +36,8 @@ class MakeNsqConnection
             $conn = [
                 $name => ObjectFactory::createObject([
                     'class' => $class,
+                    'topic' => $name,
+                    'init()' => [],
                     'pool' => ObjectFactory::createObject([
                         'class' => SocketPool::class,
                         'client' => $type,

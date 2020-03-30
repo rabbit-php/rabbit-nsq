@@ -10,8 +10,12 @@ namespace rabbit\nsq;
 
 use Co\System;
 use rabbit\App;
+use rabbit\contract\InitInterface;
+use rabbit\core\BaseObject;
+use rabbit\exception\InvalidArgumentException;
 use rabbit\helper\ArrayHelper;
 use rabbit\helper\VarDumper;
+use rabbit\httpclient\Client;
 use rabbit\nsq\wire\Reader;
 use rabbit\nsq\wire\Writer;
 use rabbit\pool\ConnectionPool;
@@ -21,7 +25,7 @@ use rabbit\socket\SocketClient;
  * Class NsqClient
  * @package rabbit\nsq
  */
-class NsqClient
+class NsqClient extends BaseObject implements InitInterface
 {
     /** @var NsqPool */
     private $pool;
@@ -33,6 +37,12 @@ class NsqClient
     protected $rdy = 1;
     /** @var float */
     protected $timeout = 5;
+    /** @var Client */
+    private $http;
+    /** @var string */
+    protected $topic;
+    /** @var string */
+    protected $channel;
 
     /**
      * NsqClient constructor.
@@ -41,19 +51,54 @@ class NsqClient
     public function __construct(ConnectionPool $pool)
     {
         $this->pool = $pool;
+        $this->http = new Client([], 'saber', true);
     }
 
     /**
-     * @param string $topic
+     * @return mixed|void
+     */
+    public function init()
+    {
+        $param = explode(':', $this->topic);
+        $this->topic = isset($param[0]) ? $param[0] : null;
+        $this->channel = isset($param[1]) ? $param[1] : null;
+        if (empty($this->topic)) {
+            throw new InvalidArgumentException("topic must be set");
+        }
+        $this->setTopicAdd();
+    }
+
+
+    public function setTopicAdd(): void
+    {
+        while (true) {
+            $response = $this->http->get($dsn ?? $this->pool->getConnectionAddress() . '/lookup', ['uri_query' => ['topic' => $this->topic]]);
+            if ($response->getStatusCode() === 200) {
+                $data = $response->jsonArray();
+                foreach ($data['channels'] as $chl) {
+                    if ($chl === $this->channel && $data['producers']) {
+                        $product = current($data['producers']);
+                        $this->pool->getPoolConfig()->setUri([$product['broadcast_address'] . ':' . $product['tcp_port']]);
+                        return;
+                    }
+                }
+                break;
+            } else {
+                System::sleep($this->pool->getPoolConfig()->getMaxWaitTime());
+            }
+        }
+    }
+
+    /**
      * @param string $message
      * @return NsqResult
      * @throws \Exception
      */
-    public function publish(string $topic, string $message): NsqResult
+    public function publish(string $message): NsqResult
     {
         try {
             $connection = $this->pool->getConnection();
-            $result = $connection->send(Writer::pub($topic, $message));
+            $result = $connection->send(Writer::pub($this->topic, $message));
             return new NsqResult($connection, $result);
         } catch (Exception $e) {
             App::error("publish error=" . (string)$e, $this->module);
@@ -61,16 +106,15 @@ class NsqClient
     }
 
     /**
-     * @param string $topic
      * @param array $bodies
      * @return NsqResult
      * @throws \Exception
      */
-    public function publishMulti(string $topic, array $bodies): NsqResult
+    public function publishMulti(array $bodies): NsqResult
     {
         try {
             $connection = $this->pool->getConnection();
-            $result = $connection->send(Writer::mpub($topic, $bodies));
+            $result = $connection->send(Writer::mpub($this->topic, $bodies));
             return new NsqResult($connection, $result);
         } catch (\Exception $e) {
             App::error("publish error=" . (string)$e, $this->module);
@@ -78,17 +122,16 @@ class NsqClient
     }
 
     /**
-     * @param string $topic
      * @param string $message
      * @param int $deferTime
      * @return NsqResult
      * @throws \Exception
      */
-    public function publishDefer(string $topic, string $message, int $deferTime): NsqResult
+    public function publishDefer(string $message, int $deferTime): NsqResult
     {
         try {
             $connection = $this->pool->getConnection();
-            $result = $connection->send(Writer::dpub($topic, $deferTime, $message));
+            $result = $connection->send(Writer::dpub($this->topic, $deferTime, $message));
             return new NsqResult($connection, $result);
         } catch (\Exception $e) {
             App::error("publish error=" . (string)$e, $this->module);
@@ -96,46 +139,33 @@ class NsqClient
     }
 
     /**
-     * @param string $topic
-     * @param string $channel
      * @param array $config
      * @param \Closure $callback
      * @throws \Exception
      */
-    public function subscribe(string $topic, string $channel, array $config, \Closure $callback): void
+    public function subscribe(array $config, \Closure $callback): void
     {
         try {
             /** @var Consumer $connection */
             for ($i = 0; $i < $this->pool->getPoolConfig()->getMinActive(); $i++) {
-                $this->doRun($topic, $channel, $config, $callback);
+                rgo(function () use ($config, $callback) {
+                    loop:
+                    $connection = $this->pool->getConnection();
+                    $connection->send(Writer::sub($this->topic, $this->channel));
+                    $connection->send(Writer::rdy(ArrayHelper::getValue($config, 'rdy', $this->rdy)));
+                    while (true) {
+                        if (!$this->handleMessage($connection, $config, $callback)) {
+                            break;
+                        }
+                    }
+                    System::sleep($this->pool->getPoolConfig()->getMaxWaitTime());
+                    $this->pool->setCurrentCount($this->pool->getCurrentCount() - 1);
+                    goto loop;
+                });
             }
         } catch (\Exception $e) {
             App::error("subscribe error=" . (string)$e, $this->module);
         }
-    }
-
-    /**
-     * @param string $topic
-     * @param string $channel
-     * @param array $config
-     * @param \Closure $callback
-     * @throws \Exception
-     */
-    private function doRun(string $topic, string $channel, array $config, \Closure $callback): void
-    {
-        $connection = $this->pool->getConnection();
-        rgo(function () use ($connection, $config, $callback, $topic, $channel) {
-            $connection->send(Writer::sub($topic, $channel));
-            $connection->send(Writer::rdy(ArrayHelper::getValue($config, 'rdy', $this->rdy)));
-            while (true) {
-                if (!$this->handleMessage($connection, $config, $callback)) {
-                    break;
-                }
-            }
-            System::sleep($this->pool->getPoolConfig()->getMaxWaitTime());
-            $this->pool->setCurrentCount();
-            $this->doRun($this->pool, $topic, $channel, $config, $callback);
-        });
     }
 
     /**
