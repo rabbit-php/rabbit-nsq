@@ -8,12 +8,13 @@
 
 namespace rabbit\nsq;
 
+use Co\System;
 use rabbit\App;
-use rabbit\helper\CoroHelper;
+use rabbit\helper\ArrayHelper;
+use rabbit\helper\VarDumper;
 use rabbit\nsq\wire\Reader;
 use rabbit\nsq\wire\Writer;
 use rabbit\pool\ConnectionPool;
-use rabbit\socket\pool\SocketPool;
 use rabbit\socket\SocketClient;
 
 /**
@@ -28,6 +29,10 @@ class NsqClient
      * @var string
      */
     private $module = 'nsq';
+    /** @var int */
+    protected $rdy = 1;
+    /** @var float */
+    protected $timeout = 5;
 
     /**
      * NsqClient constructor.
@@ -100,12 +105,9 @@ class NsqClient
     public function subscribe(string $topic, string $channel, array $config, \Closure $callback): void
     {
         try {
-            /** @var SocketPool $pool */
-            $pool = $config['pool'];
-            unset($config['pool']);
             /** @var Consumer $connection */
-            for ($i = 0; $i < $pool->getPoolConfig()->getMinActive(); $i++) {
-                $this->doRun($pool, $topic, $channel, $config, $callback);
+            for ($i = 0; $i < $this->pool->getPoolConfig()->getMinActive(); $i++) {
+                $this->doRun($topic, $channel, $config, $callback);
             }
         } catch (\Exception $e) {
             App::error("subscribe error=" . (string)$e, $this->module);
@@ -113,26 +115,26 @@ class NsqClient
     }
 
     /**
-     * @param SocketPool $pool
      * @param string $topic
      * @param string $channel
      * @param array $config
      * @param \Closure $callback
+     * @throws \Exception
      */
-    private function doRun(SocketPool $pool, string $topic, string $channel, array $config, \Closure $callback): void
+    private function doRun(string $topic, string $channel, array $config, \Closure $callback): void
     {
-        $connection = $pool->getConnection();
-        go(function () use ($pool, $connection, $config, $callback, $topic, $channel) {
+        $connection = $this->pool->getConnection();
+        rgo(function () use ($connection, $config, $callback, $topic, $channel) {
             $connection->send(Writer::sub($topic, $channel));
-            $connection->send(Writer::rdy($config['rdy'] ?? 1));
+            $connection->send(Writer::rdy(ArrayHelper::getValue($config, 'rdy', $this->rdy)));
             while (true) {
                 if (!$this->handleMessage($connection, $config, $callback)) {
                     break;
                 }
             }
-            CoroHelper::sleep($pool->getPoolConfig()->getMaxWaitTime());
-            $pool->setCurrentCount();
-            $this->doRun($pool, $topic, $channel, $config, $callback);
+            System::sleep($this->pool->getPoolConfig()->getMaxWaitTime());
+            $this->pool->setCurrentCount();
+            $this->doRun($this->pool, $topic, $channel, $config, $callback);
         });
     }
 
@@ -154,23 +156,23 @@ class NsqClient
         if ($reader->isHeartbeat()) {
             $connection->send(Writer::nop());
         } elseif ($reader->isMessage()) {
-            $msg = $reader->getMessage($connection);
+            $msg = $reader->getFrame();
             try {
                 call_user_func($callback, $msg);
             } catch (\Exception $e) {
                 App::error("Will be requeued: " . $e->getMessage(), $this->module);
-                $connection->send(Writer::touch($msg->getId()));
+                $connection->send(Writer::touch($msg['id']));
                 $connection->send(Writer::req(
-                    $msg->getId(),
-                    $config['timeout'] ? $config['timeout'] . 's' : '5s'
+                    $msg['id'],
+                    ArrayHelper::getValue($config, 'timeout', $this->timeout)
                 ));
             }
-            $connection->send(Writer::fin($msg->getId()));
-            $connection->send(Writer::rdy($config['rdy'] ?? 1));
+            $connection->send(Writer::fin($msg['id']));
+            $connection->send(Writer::rdy(ArrayHelper::getValue($config, 'rdy', $this->rdy)));
         } elseif ($reader->isOk()) {
             App::info('Ignoring "OK" frame in SUB loop', $this->module);
         } else {
-            App::error("Error/unexpected frame received: =" . $reader->getMessage($connection), $this->module);
+            App::error("Error/unexpected frame received: =" . VarDumper::getDumper()->dumpAsString($reader->getFrame()), $this->module);
         }
         return true;
     }

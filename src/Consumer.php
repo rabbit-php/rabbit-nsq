@@ -10,7 +10,6 @@ namespace rabbit\nsq;
 
 
 use rabbit\nsq\wire\Writer;
-use rabbit\pool\PoolInterface;
 use rabbit\socket\SocketClient;
 
 /**
@@ -20,12 +19,12 @@ use rabbit\socket\SocketClient;
 class Consumer extends SocketClient
 {
     /**
-     * Tcp constructor.
-     * @param PoolInterface $connectPool
+     * Consumer constructor.
+     * @param string $poolKey
      */
-    public function __construct(PoolInterface $connectPool)
+    public function __construct(string $poolKey)
     {
-        parent::__construct($connectPool);
+        parent::__construct($poolKey);
         $this->send(Writer::MAGIC_V2);
     }
 }

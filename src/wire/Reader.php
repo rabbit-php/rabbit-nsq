@@ -9,9 +9,10 @@
 namespace rabbit\nsq\wire;
 
 use rabbit\App;
+use rabbit\core\Exception;
 use rabbit\nsq\ConnectionException;
 use rabbit\nsq\message\Message;
-use rabbit\nsq\utility\IntPacker;
+use rabbit\pool\ConnectionInterface;
 use rabbit\socket\SocketClient;
 
 /**
@@ -40,6 +41,14 @@ class Reader
     }
 
     /**
+     * @return array
+     */
+    public function getFrame(): array
+    {
+        return $this->frame;
+    }
+
+    /**
      * @return Reader
      * @throws \Exception
      */
@@ -62,10 +71,22 @@ class Reader
 
         if ($size !== 0) {
             try {
-                if (self::TYPE_RESPONSE == $type) {
-                    $frame["response"] = $this->readString($reader, $size - 4);
-                } elseif (self::TYPE_ERROR == $type) {
-                    $frame["error"] = $this->readString($reader, $size - 4);
+                switch ($type) {
+                    case self::TYPE_RESPONSE:
+                        $frame['response'] = $this->readString($reader, $size - 4);
+                        break;
+                    case self::TYPE_ERROR:
+                        $frame['error'] = $this->readString($reader, $size - 4);
+                        break;
+                    case self::TYPE_MESSAGE:
+                        $frame['ts'] = $this->readLong($reader);
+                        $frame['attempts'] = $this->readShort($reader);
+                        $frame['id'] = $this->readString($reader, 16);
+                        $frame['payload'] = $this->readString($reader, $size - 30);
+                        break;
+                    default:
+                        throw new Exception($this->readString($reader, $size - 4));
+                        break;
                 }
             } catch (ConnectionException $e) {
                 throw $e;
@@ -89,19 +110,6 @@ class Reader
     //                         attempts
 
     /**
-     * @param $size
-     * @return string
-     */
-    private function readInt(SocketClient $reader, int $size): int
-    {
-        list(, $res) = unpack('N', $this->read($reader, $size));
-        if ((PHP_INT_SIZE !== 4)) {
-            $res = sprintf("%u", $res);
-        }
-        return (int)$res;
-    }
-
-    /**
      * @param int $size
      * @return string
      */
@@ -115,43 +123,59 @@ class Reader
     }
 
     /**
-     * @param $size
+     * @param ConnectionInterface $connection
+     * @return int
+     */
+    private function readShort(ConnectionInterface $connection): int
+    {
+        list(, $res) = unpack('n', $connection->recv(2));
+        return $res;
+    }
+
+    /**
+     * @param ConnectionInterface $connection
+     * @return int
+     */
+    private function readInt(ConnectionInterface $connection): int
+    {
+        list(, $res) = unpack('N', $connection->recv(4));
+        if ((PHP_INT_SIZE !== 4)) {
+            $res = sprintf("%u", $res);
+        }
+        return (int)$res;
+    }
+
+    /**
+     * @param ConnectionInterface $connection
      * @return string
      */
-    private function readString(SocketClient $reader, int $size): string
+    private function readLong(ConnectionInterface $connection): string
     {
-        $bytes = unpack("c{$size}chars", $this->read($reader, $size));
-        return implode(array_map("chr", $bytes));
+        $hi = unpack('N', $connection->recv(4));
+        $lo = unpack('N', $connection->recv(4));
+
+        // workaround signed/unsigned braindamage in php
+        $hi = sprintf("%u", $hi[1]);
+        $lo = sprintf("%u", $lo[1]);
+
+        return bcadd(bcmul($hi, "4294967296"), $lo);
     }
 
-    public function getMessage(SocketClient $reader): ?Message
+    /**
+     * @param ConnectionInterface $connection
+     * @param int $size
+     * @return string
+     */
+    private function readString(ConnectionInterface $connection, int $size): string
     {
-        if (null !== $this->frame && self::TYPE_MESSAGE == $this->frame["type"]) {
-            return (new Message())->setTimestamp($this->readInt64($reader, 8))
-                ->setAttempts($this->readUInt16($reader, 2))
-                ->setId($this->readString($reader, 16))
-                ->setBody($this->readString($reader, $this->frame["size"] - 30))
-                ->setDecoded();
+        $temp = unpack("c{$size}chars", $connection->recv($size));
+        $out = "";
+        foreach ($temp as $v) {
+            if ($v > 0) {
+                $out .= chr($v);
+            }
         }
-        return null;
-    }
-
-    /**
-     * @param $size
-     * @return int
-     */
-    private function readInt64(SocketClient $reader, int $size): int
-    {
-        return IntPacker::int64($this->read($reader, $size));
-    }
-
-    /**
-     * @param $size
-     * @return int
-     */
-    private function readUInt16(SocketClient $reader, int $size): int
-    {
-        return IntPacker::uInt16($this->read($reader, $size));
+        return $out;
     }
 
     /**

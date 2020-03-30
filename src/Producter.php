@@ -20,12 +20,13 @@ use rabbit\socket\SocketClient;
 class Producter extends SocketClient
 {
     /**
-     * Tcp constructor.
-     * @param PoolInterface $connectPool
+     * Producter constructor.
+     * @param string $poolKey
+     * @throws \Exception
      */
-    public function __construct(PoolInterface $connectPool)
+    public function __construct(string $poolKey)
     {
-        parent::__construct($connectPool);
+        parent::__construct($poolKey);
         $this->send(Writer::MAGIC_V2);
         //禁用心跳
         $this->send(Writer::identify(["heartbeat_interval" => -1]));
