@@ -40,6 +40,8 @@ class NsqClient extends BaseObject implements InitInterface
     /** @var Client */
     private $http;
     /** @var string */
+    protected $dsnd;
+    /** @var string */
     protected $topic;
     /** @var string */
     protected $channel;
@@ -48,9 +50,10 @@ class NsqClient extends BaseObject implements InitInterface
      * NsqClient constructor.
      * @param ConnectionPool $pool
      */
-    public function __construct(ConnectionPool $pool)
+    public function __construct(ConnectionPool $pool, string $dsnd)
     {
         $this->pool = $pool;
+        $this->dsnd = $dsnd;
         $this->http = new Client([], 'saber', true);
     }
 
@@ -72,20 +75,41 @@ class NsqClient extends BaseObject implements InitInterface
     public function setTopicAdd(): void
     {
         while (true) {
-            $response = $this->http->get($dsn ?? $this->pool->getConnectionAddress() . '/lookup', ['uri_query' => ['topic' => $this->topic]]);
-            if ($response->getStatusCode() === 200) {
-                $data = $response->jsonArray();
-                foreach ($data['channels'] as $chl) {
-                    if ($chl === $this->channel && $data['producers']) {
-                        $product = current($data['producers']);
-                        $this->pool->getPoolConfig()->setUri([$product['broadcast_address'] . ':' . $product['tcp_port']]);
-                        return;
+            try {
+                $response = $this->http->get($this->pool->getConnectionAddress() . '/lookup', ['uri_query' => ['topic' => $this->topic]]);
+                if ($response->getStatusCode() === 200) {
+                    $data = $response->jsonArray();
+                    foreach ($data['channels'] as $chl) {
+                        if ($chl === $this->channel && $data['producers']) {
+                            $product = current($data['producers']);
+                            $this->pool->getPoolConfig()->setUri([$product['broadcast_address'] . ':' . $product['tcp_port']]);
+                            return;
+                        }
                     }
+                    break;
+                } else {
+                    System::sleep($this->pool->getPoolConfig()->getMaxWaitTime());
                 }
-                break;
-            } else {
-                System::sleep($this->pool->getPoolConfig()->getMaxWaitTime());
+            } catch (\Throwable $exception) {
+                if ($exception->getCode() === 404) {
+                    $this->createTopic();
+                }
             }
+        }
+    }
+
+    /**
+     * @return bool
+     */
+    public function createTopic(): void
+    {
+        $response = $this->http->post($this->dsnd . '/topic/create', ['uri_query' => ['topic' => $this->topic]]);
+        if ($response->getStatusCode() === 200) {
+            App::info("Create topic $this->topic success!");
+        }
+        $response = $this->http->post($this->dsnd . '/channel/create', ['uri_query' => ['topic' => $this->topic, 'channel' => $this->channel]]);
+        if ($response->getStatusCode() === 200) {
+            App::info("Create topic $this->topic channel $this->channel success!");
         }
     }
 

@@ -16,15 +16,17 @@ class MakeNsqConnection
     /**
      * @param string $name
      * @param string $dsn
+     * @param string $dsnd
+     * @param string $type
      * @param array $pool
-     * @param array $config
+     * @param array|null $config
      * @throws \DI\DependencyException
      * @throws \DI\NotFoundException
      */
     public static function addConnection(
-        string $class,
         string $name,
         string $dsn,
+        string $dsnd,
         string $type,
         array $pool,
         array $config = null
@@ -35,9 +37,9 @@ class MakeNsqConnection
         if (!$manager->hasConnection($name)) {
             $conn = [
                 $name => ObjectFactory::createObject([
-                    'class' => $class,
+                    'class' => NsqClient::class,
+                    'dsnd' => $dsnd,
                     'topic' => $name,
-                    'init()' => [],
                     'pool' => ObjectFactory::createObject([
                         'class' => SocketPool::class,
                         'client' => $type,
