@@ -211,18 +211,20 @@ class NsqClient extends BaseObject implements InitInterface
             $connection->send(Writer::nop());
         } elseif ($reader->isMessage()) {
             $msg = $reader->getFrame();
-            try {
-                call_user_func($callback, $msg);
-            } catch (\Exception $e) {
-                App::error("Will be requeued: " . $e->getMessage(), $this->module);
-                $connection->send(Writer::touch($msg['id']));
-                $connection->send(Writer::req(
-                    $msg['id'],
-                    ArrayHelper::getValue($config, 'timeout', $this->timeout)
-                ));
-            }
-            $connection->send(Writer::fin($msg['id']));
-            $connection->send(Writer::rdy(ArrayHelper::getValue($config, 'rdy', $this->rdy)));
+            rgo(function () use ($callback, $msg, $connection) {
+                try {
+                    call_user_func($callback, $msg);
+                } catch (\Exception $e) {
+                    App::error("Will be requeued: " . $e->getMessage(), $this->module);
+                    $connection->send(Writer::touch($msg['id']));
+                    $connection->send(Writer::req(
+                        $msg['id'],
+                        ArrayHelper::getValue($config, 'timeout', $this->timeout)
+                    ));
+                }
+                $connection->send(Writer::fin($msg['id']));
+                $connection->send(Writer::rdy(ArrayHelper::getValue($config, 'rdy', $this->rdy)));
+            });
         } elseif ($reader->isOk()) {
             App::info('Ignoring "OK" frame in SUB loop', $this->module);
         } else {
