@@ -211,7 +211,7 @@ class NsqClient extends BaseObject implements InitInterface
             $connection->send(Writer::nop());
         } elseif ($reader->isMessage()) {
             $msg = $reader->getFrame();
-            rgo(function () use ($callback, $msg, $connection) {
+            rgo(function () use ($connection, $config, $callback, &$msg) {
                 try {
                     call_user_func($callback, $msg);
                 } catch (\Exception $e) {
