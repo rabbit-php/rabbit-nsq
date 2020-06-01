@@ -183,7 +183,7 @@ class NsqClient extends BaseObject implements InitInterface
                         }
                     }
                     System::sleep($this->pool->getPoolConfig()->getMaxWaitTime());
-                    $this->pool->setCurrentCount($this->pool->getCurrentCount() - 1);
+                    $this->pool->sub();
                     goto loop;
                 });
             }
