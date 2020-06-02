@@ -88,7 +88,7 @@ class NsqClient extends BaseObject implements InitInterface
                     }
                     break;
                 } else {
-                    System::sleep($this->pool->getPoolConfig()->getMaxWaitTime());
+                    System::sleep($this->pool->getPoolConfig()->getMaxWait());
                 }
             } catch (\Throwable $exception) {
                 if ($exception->getCode() === 404) {
@@ -182,7 +182,7 @@ class NsqClient extends BaseObject implements InitInterface
                             break;
                         }
                     }
-                    System::sleep($this->pool->getPoolConfig()->getMaxWaitTime());
+                    System::sleep($this->pool->getPoolConfig()->getMaxWait());
                     $this->pool->sub();
                     goto loop;
                 });

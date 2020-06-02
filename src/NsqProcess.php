@@ -63,7 +63,7 @@ class NsqProcess extends AbstractProcess
                                 }
                             }
                         }
-                        System::sleep($config['pool']->getPoolConfig()->getMaxWaitTime());
+                        System::sleep($config['pool']->getPoolConfig()->getMaxWait());
                     }
                 }
                 $this->nsq->subscribe($topic, $channel, $config, function (array $msg) use ($handler) {
