@@ -3,9 +3,9 @@
   "description": "rabbit nsq",
   "type": "library",
   "require": {
-    "rabbit/framework": "dev-master",
-    "rabbit/pool": "dev-master",
-    "rabbit/socket": "dev-master"
+    "rabbit/framework": "^1.0",
+    "rabbit/pool": "^1.0",
+    "rabbit/socket": "^1.0"
   },
   "license": "MIT",
   "authors": [
