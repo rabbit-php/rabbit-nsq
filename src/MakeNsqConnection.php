@@ -34,7 +34,7 @@ class MakeNsqConnection
     {
         /** @var Manager $manager */
         $manager = getDI('nsq');
-        if (!$manager->hasConnection($name)) {
+        if (!$manager->has($name)) {
             $conn = [
                 $name => ObjectFactory::createObject([
                     'class' => NsqClient::class,
@@ -53,7 +53,7 @@ class MakeNsqConnection
                         ], [], false)
                     ], [], false)
                 ], [], false)];
-            $manager->addConnection($conn);
+            $manager->add($conn);
         }
     }
 }

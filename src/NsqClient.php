@@ -121,7 +121,7 @@ class NsqClient extends BaseObject implements InitInterface
     public function publish(string $message): NsqResult
     {
         try {
-            $connection = $this->pool->getConnection();
+            $connection = $this->pool->get();
             $result = $connection->send(Writer::pub($this->topic, $message));
             return new NsqResult($connection, $result);
         } catch (Exception $e) {
@@ -137,7 +137,7 @@ class NsqClient extends BaseObject implements InitInterface
     public function publishMulti(array $bodies): NsqResult
     {
         try {
-            $connection = $this->pool->getConnection();
+            $connection = $this->pool->get();
             $result = $connection->send(Writer::mpub($this->topic, $bodies));
             return new NsqResult($connection, $result);
         } catch (\Exception $e) {
@@ -154,7 +154,7 @@ class NsqClient extends BaseObject implements InitInterface
     public function publishDefer(string $message, int $deferTime): NsqResult
     {
         try {
-            $connection = $this->pool->getConnection();
+            $connection = $this->pool->get();
             $result = $connection->send(Writer::dpub($this->topic, $deferTime, $message));
             return new NsqResult($connection, $result);
         } catch (\Exception $e) {
@@ -174,7 +174,7 @@ class NsqClient extends BaseObject implements InitInterface
             for ($i = 0; $i < $this->pool->getPoolConfig()->getMinActive(); $i++) {
                 rgo(function () use ($config, $callback) {
                     loop:
-                    $connection = $this->pool->getConnection();
+                    $connection = $this->pool->get();
                     $connection->send(Writer::sub($this->topic, $this->channel));
                     $connection->send(Writer::rdy(ArrayHelper::getValue($config, 'rdy', $this->rdy)));
                     while (true) {
