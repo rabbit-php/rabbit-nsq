@@ -3,8 +3,6 @@ declare(strict_types=1);
 
 namespace Rabbit\Nsq;
 
-use Rabbit\Nsq\Wire\Reader;
-use Rabbit\Nsq\Wire\Writer;
 use Rabbit\Socket\SocketClient;
 use Throwable;
 

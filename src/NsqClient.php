@@ -13,8 +13,6 @@ use Rabbit\Base\Exception\InvalidArgumentException;
 use Rabbit\Base\Helper\ArrayHelper;
 use Rabbit\Base\Helper\VarDumper;
 use Rabbit\HttpClient\Client;
-use Rabbit\Nsq\Wire\Reader;
-use Rabbit\Nsq\Wire\Writer;
 use Rabbit\Pool\ConnectionPool;
 use Rabbit\Socket\SocketClient;
 use Throwable;
@@ -29,11 +27,11 @@ class NsqClient extends BaseObject implements InitInterface
     /**
      * @var string
      */
-    private $module = 'nsq';
+    private string $module = 'nsq';
     /** @var int */
-    protected $rdy = 1;
+    protected int $rdy = 1;
     /** @var float */
-    protected $timeout = 5;
+    protected float $timeout = 5;
     /** @var Client */
     private Client $http;
     /** @var string */

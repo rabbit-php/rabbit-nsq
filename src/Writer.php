@@ -1,10 +1,9 @@
 <?php
 declare(strict_types=1);
 
-namespace Rabbit\Nsq\Wire;
+namespace Rabbit\Nsq;
 
 use Rabbit\Base\Helper\JsonHelper;
-use Rabbit\Nsq\IntPacker;
 
 /**
  * Class Writer

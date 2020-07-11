@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Rabbit\Nsq\Wire;
+namespace Rabbit\Nsq;
 
 use Exception;
 use Rabbit\Base\App;
