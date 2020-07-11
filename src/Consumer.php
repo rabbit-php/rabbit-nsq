@@ -1,20 +1,14 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: Administrator
- * Date: 2018/11/14
- * Time: 3:09
- */
+declare(strict_types=1);
 
-namespace rabbit\nsq;
+namespace Rabbit\Nsq;
 
-
-use rabbit\nsq\wire\Writer;
-use rabbit\socket\SocketClient;
+use Rabbit\Nsq\Wire\Writer;
+use Rabbit\Socket\SocketClient;
 
 /**
- * Class Tcp
- * @package rabbit\nsq
+ * Class Consumer
+ * @package Rabbit\Nsq
  */
 class Consumer extends SocketClient
 {

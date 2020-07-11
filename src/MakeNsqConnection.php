@@ -1,11 +1,15 @@
 <?php
 declare(strict_types=1);
 
-namespace rabbit\nsq;
+namespace Rabbit\Nsq;
 
-use rabbit\core\ObjectFactory;
-use rabbit\socket\pool\SocketConfig;
-use rabbit\socket\pool\SocketPool;
+use DI\DependencyException;
+use DI\NotFoundException;
+use Rabbit\Pool\BaseManager;
+use Rabbit\Socket\Pool\SocketConfig;
+use Rabbit\Socket\pool\SocketPool;
+use ReflectionException;
+use Throwable;
 
 /**
  * Class MakeNsqConnection
@@ -20,8 +24,10 @@ class MakeNsqConnection
      * @param string $type
      * @param array $pool
      * @param array|null $config
-     * @throws \DI\DependencyException
-     * @throws \DI\NotFoundException
+     * @throws DependencyException
+     * @throws NotFoundException
+     * @throws ReflectionException
+     * @throws Throwable
      */
     public static function addConnection(
         string $name,
@@ -32,18 +38,18 @@ class MakeNsqConnection
         array $config = null
     ): void
     {
-        /** @var Manager $manager */
+        /** @var BaseManager $manager */
         $manager = getDI('nsq');
         if (!$manager->has($name)) {
             $conn = [
-                $name => ObjectFactory::createObject([
+                $name => create([
                     'class' => NsqClient::class,
                     'dsnd' => $dsnd,
                     'topic' => $name,
-                    'pool' => ObjectFactory::createObject([
+                    'pool' => create([
                         'class' => SocketPool::class,
                         'client' => $type,
-                        'poolConfig' => ObjectFactory::createObject([
+                        'poolConfig' => create([
                             'class' => SocketConfig::class,
                             'minActive' => $pool['min'],
                             'maxActive' => $pool['max'],

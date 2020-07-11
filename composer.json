@@ -3,9 +3,18 @@
   "description": "rabbit nsq",
   "type": "library",
   "require": {
-    "rabbit/framework": "^1.0",
-    "rabbit/pool": "^1.0",
-    "rabbit/socket": "^1.0"
+    "php": ">=7.4.0",
+    "ext-swoole": ">=4.5.0",
+    "rabbit/httpclient": "dev-master",
+    "rabbit/base": "dev-master",
+    "rabbit/parser": "dev-master",
+    "rabbit/pool": "dev-master",
+    "rabbit/socket": "dev-master",
+    "ext-bcmath": "*"
+  },
+  "require-dev": {
+    "swoole/ide-helper": "@dev",
+    "phpunit/phpunit": "*"
   },
   "license": "MIT",
   "authors": [
@@ -16,7 +25,7 @@
   ],
   "autoload": {
     "psr-4": {
-      "rabbit\\nsq\\": "src/"
+      "Rabbit\\Nsq\\": "src/"
     }
   }
 }

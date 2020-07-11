@@ -1,28 +1,23 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: Administrator
- * Date: 2018/12/9
- * Time: 18:01
- */
+declare(strict_types=1);
 
-namespace rabbit\nsq;
+namespace Rabbit\Nsq;
 
-use rabbit\nsq\wire\Reader;
-use rabbit\nsq\wire\Writer;
-use rabbit\pool\PoolInterface;
-use rabbit\socket\SocketClient;
+use Rabbit\Nsq\Wire\Reader;
+use Rabbit\Nsq\Wire\Writer;
+use Rabbit\Socket\SocketClient;
+use Throwable;
 
 /**
- * Class Producter
- * @package rabbit\nsq
+ * Class Producer
+ * @package Rabbit\Nsq
  */
-class Producter extends SocketClient
+class Producer extends SocketClient
 {
     /**
-     * Producter constructor.
+     * Producer constructor.
      * @param string $poolKey
-     * @throws \Exception
+     * @throws Throwable
      */
     public function __construct(string $poolKey)
     {

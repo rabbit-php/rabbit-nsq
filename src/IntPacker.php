@@ -1,16 +1,11 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: Administrator
- * Date: 2018/11/13
- * Time: 10:32
- */
+declare(strict_types=1);
 
-namespace rabbit\nsq\utility;
+namespace Rabbit\Nsq;
 
 /**
  * Class IntPacker
- * @package rabbit\nsq\utility
+ * @package Rabbit\Nsq
  */
 class IntPacker
 {

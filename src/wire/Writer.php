@@ -1,15 +1,10 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: Administrator
- * Date: 2018/11/13
- * Time: 10:37
- */
+declare(strict_types=1);
 
-namespace rabbit\nsq\wire;
+namespace Rabbit\Nsq\Wire;
 
-use rabbit\helper\JsonHelper;
-use rabbit\nsq\utility\IntPacker;
+use Rabbit\Base\Helper\JsonHelper;
+use Rabbit\Nsq\IntPacker;
 
 /**
  * Class Writer

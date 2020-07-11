@@ -1,34 +1,31 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: Administrator
- * Date: 2018/11/13
- * Time: 11:10
- */
+declare(strict_types=1);
 
-namespace rabbit\nsq;
+namespace Rabbit\Nsq;
 
+use Closure;
 use Co\System;
-use rabbit\App;
-use rabbit\contract\InitInterface;
-use rabbit\core\BaseObject;
-use rabbit\exception\InvalidArgumentException;
-use rabbit\helper\ArrayHelper;
-use rabbit\helper\VarDumper;
-use rabbit\httpclient\Client;
-use rabbit\nsq\wire\Reader;
-use rabbit\nsq\wire\Writer;
-use rabbit\pool\ConnectionPool;
-use rabbit\socket\SocketClient;
+use Rabbit\Base\App;
+use Rabbit\Base\Contract\InitInterface;
+use Rabbit\Base\Core\BaseObject;
+use Rabbit\Base\Core\Exception;
+use Rabbit\Base\Exception\InvalidArgumentException;
+use Rabbit\Base\Helper\ArrayHelper;
+use Rabbit\Base\Helper\VarDumper;
+use Rabbit\HttpClient\Client;
+use Rabbit\Nsq\Wire\Reader;
+use Rabbit\Nsq\Wire\Writer;
+use Rabbit\Pool\ConnectionPool;
+use Rabbit\Socket\SocketClient;
+use Throwable;
 
 /**
  * Class NsqClient
- * @package rabbit\nsq
+ * @package Rabbit\Nsq
  */
 class NsqClient extends BaseObject implements InitInterface
 {
-    /** @var NsqPool */
-    private $pool;
+    private ConnectionPool $pool;
     /**
      * @var string
      */
@@ -38,17 +35,17 @@ class NsqClient extends BaseObject implements InitInterface
     /** @var float */
     protected $timeout = 5;
     /** @var Client */
-    private $http;
+    private Client $http;
     /** @var string */
-    protected $dsnd;
+    protected string $dsnd;
     /** @var string */
-    protected $topic;
-    /** @var string */
-    protected $channel;
+    protected ?string $topic;
+    protected ?string $channel;
 
     /**
      * NsqClient constructor.
      * @param ConnectionPool $pool
+     * @param string $dsnd
      */
     public function __construct(ConnectionPool $pool, string $dsnd)
     {
@@ -59,6 +56,7 @@ class NsqClient extends BaseObject implements InitInterface
 
     /**
      * @return mixed|void
+     * @throws Throwable
      */
     public function init()
     {
@@ -71,7 +69,9 @@ class NsqClient extends BaseObject implements InitInterface
         $this->setTopicAdd();
     }
 
-
+    /**
+     * @throws Throwable
+     */
     public function setTopicAdd(): void
     {
         while (true) {
@@ -82,7 +82,7 @@ class NsqClient extends BaseObject implements InitInterface
                     foreach ($data['channels'] as $chl) {
                         if ($chl === $this->channel && $data['producers']) {
                             $product = current($data['producers']);
-                            $this->pool->getPoolConfig()->setUri([$product['broadcast_address'] . ':' . $product['tcp_port']]);
+                            $this->pool->getPoolConfig()->setUri($product['broadcast_address'] . ':' . $product['tcp_port']);
                             return;
                         }
                     }
@@ -90,7 +90,7 @@ class NsqClient extends BaseObject implements InitInterface
                 } else {
                     System::sleep($this->pool->getPoolConfig()->getMaxWait());
                 }
-            } catch (\Throwable $exception) {
+            } catch (Throwable $exception) {
                 if ($exception->getCode() === 404) {
                     $this->createTopic();
                 }
@@ -99,7 +99,8 @@ class NsqClient extends BaseObject implements InitInterface
     }
 
     /**
-     * @return bool
+     * @return void
+     * @throws Throwable
      */
     public function createTopic(): void
     {
@@ -115,59 +116,68 @@ class NsqClient extends BaseObject implements InitInterface
 
     /**
      * @param string $message
-     * @return NsqResult
-     * @throws \Exception
+     * @return array|null
+     * @throws Throwable
      */
-    public function publish(string $message): NsqResult
+    public function publish(string $message): ?array
     {
         try {
             $connection = $this->pool->get();
-            $result = $connection->send(Writer::pub($this->topic, $message));
-            return new NsqResult($connection, $result);
+            $connection->send(Writer::pub($this->topic, $message));
+            $reader = (new Reader($this->pool->getTimeout()))->bindFrame($connection);
+            $connection->release();
+            return $reader->getFrame();
         } catch (Exception $e) {
             App::error("publish error=" . (string)$e, $this->module);
         }
+        return null;
     }
 
     /**
      * @param array $bodies
-     * @return NsqResult
-     * @throws \Exception
+     * @return array|null
+     * @throws Throwable
      */
-    public function publishMulti(array $bodies): NsqResult
+    public function publishMulti(array $bodies): ?array
     {
         try {
             $connection = $this->pool->get();
-            $result = $connection->send(Writer::mpub($this->topic, $bodies));
-            return new NsqResult($connection, $result);
+            $connection->send(Writer::mpub($this->topic, $bodies));
+            $reader = (new Reader($this->pool->getTimeout()))->bindFrame($connection);
+            $connection->release();
+            return $reader->getFrame();
         } catch (\Exception $e) {
             App::error("publish error=" . (string)$e, $this->module);
         }
+        return null;
     }
 
     /**
      * @param string $message
      * @param int $deferTime
-     * @return NsqResult
-     * @throws \Exception
+     * @return array|null
+     * @throws Throwable
      */
-    public function publishDefer(string $message, int $deferTime): NsqResult
+    public function publishDefer(string $message, int $deferTime): ?array
     {
         try {
             $connection = $this->pool->get();
-            $result = $connection->send(Writer::dpub($this->topic, $deferTime, $message));
-            return new NsqResult($connection, $result);
+            $connection->send(Writer::dpub($this->topic, $deferTime, $message));
+            $reader = (new Reader($this->pool->getTimeout()))->bindFrame($connection);
+            $connection->release();
+            return $reader->getFrame();
         } catch (\Exception $e) {
             App::error("publish error=" . (string)$e, $this->module);
         }
+        return null;
     }
 
     /**
      * @param array $config
-     * @param \Closure $callback
-     * @throws \Exception
+     * @param Closure $callback
+     * @throws Throwable
      */
-    public function subscribe(array $config, \Closure $callback): void
+    public function subscribe(array $config, Closure $callback): void
     {
         try {
             /** @var Consumer $connection */
@@ -193,17 +203,17 @@ class NsqClient extends BaseObject implements InitInterface
     }
 
     /**
-     * @param string $body
-     * @param \Swoole\Client $connection
+     * @param SocketClient $connection
      * @param array $config
-     * @param \Closure $callback
-     * @throws \Exception
+     * @param Closure $callback
+     * @return bool
+     * @throws Throwable
      */
-    private function handleMessage(SocketClient $connection, array $config, \Closure $callback): bool
+    private function handleMessage(SocketClient $connection, array $config, Closure $callback): bool
     {
         try {
             $reader = (new Reader(-1))->bindFrame($connection);
-        } catch (ConnectionException $throwable) {
+        } catch (\Throwable $throwable) {
             return false;
         }
 

@@ -1,23 +1,16 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: Administrator
- * Date: 2018/11/13
- * Time: 10:55
- */
+declare(strict_types=1);
 
-namespace rabbit\nsq\wire;
+namespace Rabbit\Nsq\Wire;
 
-use rabbit\App;
-use rabbit\core\Exception;
-use rabbit\nsq\ConnectionException;
-use rabbit\nsq\message\Message;
-use rabbit\pool\ConnectionInterface;
-use rabbit\socket\SocketClient;
+use Exception;
+use Rabbit\Base\App;
+use Rabbit\Socket\SocketClient;
+use Throwable;
 
 /**
  * Class Reader
- * @package rabbit\nsq\wire
+ * @package Rabbit\Nsq\Wire
  */
 class Reader
 {
@@ -26,14 +19,14 @@ class Reader
     const TYPE_MESSAGE = 2;
     const HEARTBEAT = "_heartbeat_";
     const OK = "OK";
-    /** @var string */
-    private $body;
+
     /** @var array */
-    private $frame;
+    private array $frame = [];
+    private ?float $timeout;
 
     /**
      * Reader constructor.
-     * @param string $body
+     * @param float|null $timeout
      */
     public function __construct(float $timeout = null)
     {
@@ -49,8 +42,9 @@ class Reader
     }
 
     /**
-     * @return Reader
-     * @throws \Exception
+     * @param SocketClient $reader
+     * @return $this
+     * @throws Throwable
      */
     public function bindFrame(SocketClient $reader): self
     {
@@ -59,10 +53,8 @@ class Reader
         try {
             $size = $this->readInt($reader, 4);
             $type = $this->readInt($reader, 4);
-        } catch (ConnectionException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            throw new \Exception("Error reading message frame [$size, $type] ({$e->getMessage()})");
+        } catch (Exception $e) {
+            throw new Exception("Error reading message frame [$size, $type] ({$e->getMessage()})");
         }
         $frame = [
             "size" => $size,
@@ -88,9 +80,7 @@ class Reader
                         throw new Exception($this->readString($reader, $size - 4));
                         break;
                 }
-            } catch (ConnectionException $e) {
-                throw $e;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 App::error($e->getMessage(), 'nsq');
             }
         }
@@ -110,33 +100,35 @@ class Reader
     //                         attempts
 
     /**
+     * @param SocketClient $reader
      * @param int $size
      * @return string
+     * @throws Exception
      */
     private function read(SocketClient $reader, int $size): string
     {
         $data = $reader->recv($size, $this->timeout ?? $reader->getPool()->getTimeout());
         if (empty($data)) {
-            throw new ConnectionException("recv empty data!");
+            throw new Exception("recv empty data!");
         }
         return $data;
     }
 
     /**
-     * @param ConnectionInterface $connection
+     * @param SocketClient $connection
      * @return int
      */
-    private function readShort(ConnectionInterface $connection): int
+    private function readShort(SocketClient $connection): int
     {
         list(, $res) = unpack('n', $connection->recv(2));
         return $res;
     }
 
     /**
-     * @param ConnectionInterface $connection
+     * @param SocketClient $connection
      * @return int
      */
-    private function readInt(ConnectionInterface $connection): int
+    private function readInt(SocketClient $connection): int
     {
         list(, $res) = unpack('N', $connection->recv(4));
         if ((PHP_INT_SIZE !== 4)) {
@@ -146,10 +138,10 @@ class Reader
     }
 
     /**
-     * @param ConnectionInterface $connection
+     * @param SocketClient $connection
      * @return string
      */
-    private function readLong(ConnectionInterface $connection): string
+    private function readLong(SocketClient $connection): string
     {
         $hi = unpack('N', $connection->recv(4));
         $lo = unpack('N', $connection->recv(4));
@@ -162,11 +154,11 @@ class Reader
     }
 
     /**
-     * @param ConnectionInterface $connection
+     * @param SocketClient $connection
      * @param int $size
      * @return string
      */
-    private function readString(ConnectionInterface $connection, int $size): string
+    private function readString(SocketClient $connection, int $size): string
     {
         $temp = unpack("c{$size}chars", $connection->recv($size));
         $out = "";
