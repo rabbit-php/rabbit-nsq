@@ -1,15 +1,12 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Rabbit\Nsq;
 
-use DI\DependencyException;
-use DI\NotFoundException;
 use Rabbit\Pool\BaseManager;
 use Rabbit\Socket\Pool\SocketConfig;
 use Rabbit\Socket\pool\SocketPool;
-use ReflectionException;
-use Throwable;
 
 /**
  * Class MakeNsqConnection
@@ -18,26 +15,22 @@ use Throwable;
 class MakeNsqConnection
 {
     /**
+     * @Author Albert 63851587@qq.com
+     * @DateTime 2020-11-05
      * @param string $name
      * @param string $dsn
      * @param string $dsnd
      * @param string $type
      * @param array $pool
-     * @param array|null $config
-     * @throws DependencyException
-     * @throws NotFoundException
-     * @throws ReflectionException
-     * @throws Throwable
+     * @return void
      */
     public static function addConnection(
         string $name,
         string $dsn,
         string $dsnd,
         string $type,
-        array $pool,
-        array $config = null
-    ): void
-    {
+        array $pool
+    ): void {
         /** @var BaseManager $manager */
         $manager = getDI('nsq');
         if (!$manager->has($name)) {
@@ -45,7 +38,6 @@ class MakeNsqConnection
                 $name => create([
                     'class' => NsqClient::class,
                     'dsnd' => $dsnd,
-                    'topic' => $name,
                     'pool' => create([
                         'class' => SocketPool::class,
                         'client' => $type,
@@ -58,7 +50,8 @@ class MakeNsqConnection
                             'uri' => [$dsn]
                         ], [], false)
                     ], [], false)
-                ], [], false)];
+                ], [], false)
+            ];
             $manager->add($conn);
         }
     }

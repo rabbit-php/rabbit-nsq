@@ -1,15 +1,13 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Rabbit\Nsq;
 
 use Closure;
-use Co\System;
 use Rabbit\Base\App;
-use Rabbit\Base\Contract\InitInterface;
 use Rabbit\Base\Core\BaseObject;
 use Rabbit\Base\Core\Exception;
-use Rabbit\Base\Exception\InvalidArgumentException;
 use Rabbit\Base\Helper\ArrayHelper;
 use Rabbit\Base\Helper\VarDumper;
 use Rabbit\HttpClient\Client;
@@ -21,24 +19,16 @@ use Throwable;
  * Class NsqClient
  * @package Rabbit\Nsq
  */
-class NsqClient extends BaseObject implements InitInterface
+class NsqClient extends BaseObject
 {
     private ConnectionPool $pool;
-    /**
-     * @var string
-     */
     private string $module = 'nsq';
-    /** @var int */
     protected int $rdy = 1;
-    /** @var float */
     protected float $timeout = 5;
-    /** @var Client */
     private Client $http;
-    /** @var string */
     protected string $dsnd;
-    /** @var string */
-    protected ?string $topic;
-    protected ?string $channel;
+
+    protected array $created = [];
 
     /**
      * NsqClient constructor.
@@ -49,48 +39,37 @@ class NsqClient extends BaseObject implements InitInterface
     {
         $this->pool = $pool;
         $this->dsnd = $dsnd;
-        $this->http = new Client([], 'saber', true);
+        $this->http = new Client();
     }
 
     /**
-     * @return mixed|void
      * @throws Throwable
      */
-    public function init()
+    public function setTopicAdd(string $topic, string $channel): void
     {
-        $param = explode(':', $this->topic);
-        $this->topic = isset($param[0]) ? $param[0] : null;
-        $this->channel = isset($param[1]) ? $param[1] : null;
-        if (empty($this->topic)) {
-            throw new InvalidArgumentException("topic must be set");
+        if (in_array("$topic:$channel", $this->created)) {
+            return;
         }
-        $this->setTopicAdd();
-    }
-
-    /**
-     * @throws Throwable
-     */
-    public function setTopicAdd(): void
-    {
         while (true) {
             try {
-                $response = $this->http->get($this->pool->getConnectionAddress() . '/lookup', ['uri_query' => ['topic' => $this->topic]]);
+                $response = $this->http->get($this->pool->getConnectionAddress() . '/lookup', ['uri_query' => ['topic' => $topic]]);
                 if ($response->getStatusCode() === 200) {
                     $data = $response->jsonArray();
                     foreach ($data['channels'] as $chl) {
-                        if ($chl === $this->channel && $data['producers']) {
+                        if ($chl === $channel && $data['producers']) {
                             $product = current($data['producers']);
                             $this->pool->getPoolConfig()->setUri($product['broadcast_address'] . ':' . $product['tcp_port']);
+                            $this->created[] = "$topic:$chl";
                             return;
                         }
                     }
                     break;
                 } else {
-                    System::sleep($this->pool->getPoolConfig()->getMaxWait());
+                    sleep($this->pool->getPoolConfig()->getMaxWait());
                 }
             } catch (Throwable $exception) {
                 if ($exception->getCode() === 404) {
-                    $this->createTopic();
+                    $this->createTopic($topic, $channel);
                 }
             }
         }
@@ -100,16 +79,17 @@ class NsqClient extends BaseObject implements InitInterface
      * @return void
      * @throws Throwable
      */
-    public function createTopic(): void
+    public function createTopic(string $topic, string $channel): void
     {
-        $response = $this->http->post($this->dsnd . '/topic/create', ['uri_query' => ['topic' => $this->topic]]);
+        $response = $this->http->post($this->dsnd . '/topic/create', ['uri_query' => ['topic' => $topic]]);
         if ($response->getStatusCode() === 200) {
-            App::info("Create topic $this->topic success!");
+            App::info("Create topic $topic success!");
         }
-        $response = $this->http->post($this->dsnd . '/channel/create', ['uri_query' => ['topic' => $this->topic, 'channel' => $this->channel]]);
+        $response = $this->http->post($this->dsnd . '/channel/create', ['uri_query' => ['topic' => $topic, 'channel' => $channel]]);
         if ($response->getStatusCode() === 200) {
-            App::info("Create topic $this->topic channel $this->channel success!");
+            App::info("Create topic $topic channel $channel success!");
         }
+        $this->created[] = "$topic:$channel";
     }
 
     /**
@@ -117,11 +97,11 @@ class NsqClient extends BaseObject implements InitInterface
      * @return array|null
      * @throws Throwable
      */
-    public function publish(string $message): ?array
+    public function publish(string $topic, string $message): ?array
     {
         try {
             $connection = $this->pool->get();
-            $connection->send(Writer::pub($this->topic, $message));
+            $connection->send(Writer::pub($topic, $message));
             $reader = (new Reader($this->pool->getTimeout()))->bindFrame($connection);
             $connection->release();
             return $reader->getFrame();
@@ -136,11 +116,11 @@ class NsqClient extends BaseObject implements InitInterface
      * @return array|null
      * @throws Throwable
      */
-    public function publishMulti(array $bodies): ?array
+    public function publishMulti(string $topic, array $bodies): ?array
     {
         try {
             $connection = $this->pool->get();
-            $connection->send(Writer::mpub($this->topic, $bodies));
+            $connection->send(Writer::mpub($topic, $bodies));
             $reader = (new Reader($this->pool->getTimeout()))->bindFrame($connection);
             $connection->release();
             return $reader->getFrame();
@@ -156,11 +136,11 @@ class NsqClient extends BaseObject implements InitInterface
      * @return array|null
      * @throws Throwable
      */
-    public function publishDefer(string $message, int $deferTime): ?array
+    public function publishDefer(string $topic, string $message, int $deferTime): ?array
     {
         try {
             $connection = $this->pool->get();
-            $connection->send(Writer::dpub($this->topic, $deferTime, $message));
+            $connection->send(Writer::dpub($topic, $deferTime, $message));
             $reader = (new Reader($this->pool->getTimeout()))->bindFrame($connection);
             $connection->release();
             return $reader->getFrame();
@@ -175,24 +155,22 @@ class NsqClient extends BaseObject implements InitInterface
      * @param Closure $callback
      * @throws Throwable
      */
-    public function subscribe(array $config, Closure $callback): void
+    public function subscribe(string $topic, string $channel, array $config, Closure $callback): void
     {
         try {
             /** @var Consumer $connection */
             for ($i = 0; $i < $this->pool->getPoolConfig()->getMinActive(); $i++) {
-                rgo(function () use ($config, $callback) {
-                    loop:
+                loop(function () use ($topic, $channel, $config, $callback) {
                     $connection = $this->pool->get();
-                    $connection->send(Writer::sub($this->topic, $this->channel));
+                    $this->pool->sub();
+                    $connection->send(Writer::sub($topic, $channel));
                     $connection->send(Writer::rdy(ArrayHelper::getValue($config, 'rdy', $this->rdy)));
                     while (true) {
                         if (!$this->handleMessage($connection, $config, $callback)) {
                             break;
                         }
                     }
-                    System::sleep($this->pool->getPoolConfig()->getMaxWait());
-                    $this->pool->sub();
-                    goto loop;
+                    sleep($this->pool->getPoolConfig()->getMaxWait());
                 });
             }
         } catch (\Exception $e) {
