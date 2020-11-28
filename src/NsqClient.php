@@ -39,7 +39,6 @@ class NsqClient extends BaseObject
     {
         $this->pool = $pool;
         $this->dsnd = $dsnd;
-        $this->http = new Client();
     }
 
     /**
@@ -52,7 +51,7 @@ class NsqClient extends BaseObject
         }
         while (true) {
             try {
-                $response = $this->http->get($this->pool->getConnectionAddress() . '/lookup', ['uri_query' => ['topic' => $topic]]);
+                $response = (new Client())->get($this->pool->getConnectionAddress() . '/lookup', ['uri_query' => ['topic' => $topic]]);
                 if ($response->getStatusCode() === 200) {
                     $data = $response->jsonArray();
                     foreach ($data['channels'] as $chl) {
@@ -81,11 +80,11 @@ class NsqClient extends BaseObject
      */
     public function createTopic(string $topic, string $channel): void
     {
-        $response = $this->http->post($this->dsnd . '/topic/create', ['uri_query' => ['topic' => $topic]]);
+        $response = (new Client())->post($this->dsnd . '/topic/create', ['uri_query' => ['topic' => $topic]]);
         if ($response->getStatusCode() === 200) {
             App::info("Create topic $topic success!");
         }
-        $response = $this->http->post($this->dsnd . '/channel/create', ['uri_query' => ['topic' => $topic, 'channel' => $channel]]);
+        $response = (new Client())->post($this->dsnd . '/channel/create', ['uri_query' => ['topic' => $topic, 'channel' => $channel]]);
         if ($response->getStatusCode() === 200) {
             App::info("Create topic $topic channel $channel success!");
         }
