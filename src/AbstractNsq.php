@@ -32,14 +32,13 @@ abstract class AbstractNsq extends BaseObject
             return;
         }
         while (true) {
-            $client = new Client();
             try {
-                $response = $client->get($this->pool->getConnectionAddress() . '/lookup', ['uri_query' => ['topic' => $topic]]);
+                $response = (new Client())->get($this->pool->getConnectionAddress() . '/lookup', ['uri_query' => ['topic' => $topic]]);
                 if ($response->getStatusCode() === 200) {
                     $data = $response->jsonArray();
                     if ($channel !== null) {
                         if (count($data['channels']) === 0) {
-                            $this->createTopic($topic, $channel, $client);
+                            $this->createTopic($topic, $channel);
                             usleep((int)($this->sleep * 1000000));
                             continue;
                         }
@@ -64,7 +63,7 @@ abstract class AbstractNsq extends BaseObject
                 }
             } catch (Throwable $exception) {
                 if ($exception->getCode() === 404) {
-                    $this->createTopic($topic, $channel, $client);
+                    $this->createTopic($topic, $channel);
                 }
             }
         }
@@ -74,9 +73,9 @@ abstract class AbstractNsq extends BaseObject
      * @return void
      * @throws Throwable
      */
-    public function createTopic(string $topic, ?string $channel = null, Client $client = null): void
+    public function createTopic(string $topic, ?string $channel = null): void
     {
-        $client = $client ?? new Client();
+        $client = new Client();
         $response = $client->post($this->dsnd . '/topic/create', ['uri_query' => ['topic' => $topic]]);
         if ($response->getStatusCode() === 200) {
             App::info("Create topic $topic success!");
