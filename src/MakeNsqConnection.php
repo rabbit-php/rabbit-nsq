@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Rabbit\Nsq;
 
-use Rabbit\Pool\BaseManager;
 use Rabbit\Socket\Pool\SocketConfig;
 use Rabbit\Socket\pool\SocketPool;
 
@@ -28,30 +27,96 @@ class MakeNsqConnection
         string $name,
         string $dsn,
         string $dsnd,
-        string $type,
+        ?string $type,
         array $pool
     ): void {
-        /** @var BaseManager $manager */
+        /** @var NsqManager $manager */
         $manager = getDI('nsq');
         if (!$manager->has($name)) {
-            $conn = [
-                $name => create([
-                    'class' => NsqClient::class,
-                    'dsnd' => $dsnd,
-                    'pool' => create([
-                        'class' => SocketPool::class,
-                        'client' => $type,
-                        'poolConfig' => create([
-                            'class' => SocketConfig::class,
-                            'minActive' => $pool['min'],
-                            'maxActive' => $pool['max'],
-                            'maxWait' => $pool['wait'],
-                            'maxReconnect' => $pool['retry'],
-                            'uri' => [$dsn]
-                        ], [], false)
-                    ], [], false)
-                ], [], false)
-            ];
+            switch ($type) {
+                case 'consumer':
+                    $conn = [
+                        $name => [
+                            'consumer' => create([
+                                'class' => Consumer::class,
+                                'dsnd' => $dsnd,
+                                'pool' => create([
+                                    'class' => SocketPool::class,
+                                    'client' => ConsumerClient::class,
+                                    'poolConfig' => create([
+                                        'class' => SocketConfig::class,
+                                        'minActive' => $pool['min'],
+                                        'maxActive' => $pool['max'],
+                                        'maxWait' => $pool['wait'],
+                                        'maxReconnect' => $pool['retry'],
+                                        'uri' => [$dsn]
+                                    ], [], false)
+                                ], [], false)
+                            ], [], false),
+                            'producer' => null
+                        ]
+                    ];
+                    break;
+                case 'producer':
+                    $conn = [
+                        $name => [
+                            'consumer' => null,
+                            'producer' => create([
+                                'class' => Producer::class,
+                                'pool' => create([
+                                    'class' => SocketPool::class,
+                                    'client' => ProducerClient::class,
+                                    'poolConfig' => create([
+                                        'class' => SocketConfig::class,
+                                        'minActive' => $pool['min'],
+                                        'maxActive' => $pool['max'],
+                                        'maxWait' => $pool['wait'],
+                                        'maxReconnect' => $pool['retry'],
+                                        'uri' => [$dsn]
+                                    ], [], false)
+                                ], [], false)
+                            ], [], false)
+                        ]
+                    ];
+                    break;
+                default:
+                    $conn = [
+                        $name => [
+                            'consumer' => create([
+                                'class' => Consumer::class,
+                                'dsnd' => $dsnd,
+                                'pool' => create([
+                                    'class' => SocketPool::class,
+                                    'client' => ConsumerClient::class,
+                                    'poolConfig' => create([
+                                        'class' => SocketConfig::class,
+                                        'minActive' => $pool['min'],
+                                        'maxActive' => $pool['max'],
+                                        'maxWait' => $pool['wait'],
+                                        'maxReconnect' => $pool['retry'],
+                                        'uri' => [$dsn]
+                                    ], [], false)
+                                ], [], false)
+                            ], [], false),
+                            'producer' => create([
+                                'class' => Producer::class,
+                                'pool' => create([
+                                    'class' => SocketPool::class,
+                                    'client' => ProducerClient::class,
+                                    'poolConfig' => create([
+                                        'class' => SocketConfig::class,
+                                        'minActive' => $pool['min'],
+                                        'maxActive' => $pool['max'],
+                                        'maxWait' => $pool['wait'],
+                                        'maxReconnect' => $pool['retry'],
+                                        'uri' => [$dsn]
+                                    ], [], false)
+                                ], [], false)
+                            ], [], false)
+                        ]
+                    ];
+            }
+
             $manager->add($conn);
         }
     }

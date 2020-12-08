@@ -1,31 +1,70 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Rabbit\Nsq;
 
-use Rabbit\Socket\SocketClient;
+use Rabbit\Base\App;
+use Rabbit\Base\Core\Exception;
 use Throwable;
 
-/**
- * Class Producer
- * @package Rabbit\Nsq
- */
-class Producer extends SocketClient
+class Producer extends AbstractNsq
 {
     /**
-     * Producer constructor.
-     * @param string $poolKey
+     * @param string $message
+     * @return array|null
      * @throws Throwable
      */
-    public function __construct(string $poolKey)
+    public function publish(string $topic, string $message): ?array
     {
-        parent::__construct($poolKey);
-        $this->send(Writer::MAGIC_V2);
-        //禁用心跳
-        $this->send(Writer::identify(["heartbeat_interval" => -1]));
-        $reader = (new Reader(-1))->bindFrame($this);
-        if (!$reader->isOk()) {
-            throw new \RuntimeException('set identify error');
+        try {
+            $connection = $this->pool->get();
+            $connection->send(Writer::pub($topic, $message));
+            $reader = (new Reader($connection))->bindFrame();
+            $connection->release();
+            return $reader->getFrame();
+        } catch (Exception $e) {
+            App::error("publish error=" . (string)$e, $this->module);
         }
+        return null;
+    }
+
+    /**
+     * @param array $bodies
+     * @return array|null
+     * @throws Throwable
+     */
+    public function publishMulti(string $topic, array $bodies): ?array
+    {
+        try {
+            $connection = $this->pool->get();
+            $connection->send(Writer::mpub($topic, $bodies));
+            $reader = (new Reader($connection))->bindFrame();
+            $connection->release();
+            return $reader->getFrame();
+        } catch (\Exception $e) {
+            App::error("publish error=" . (string)$e, $this->module);
+        }
+        return null;
+    }
+
+    /**
+     * @param string $message
+     * @param int $deferTime
+     * @return array|null
+     * @throws Throwable
+     */
+    public function publishDefer(string $topic, string $message, int $deferTime): ?array
+    {
+        try {
+            $connection = $this->pool->get();
+            $connection->send(Writer::dpub($topic, $deferTime, $message));
+            $reader = (new Reader($connection))->bindFrame();
+            $connection->release();
+            return $reader->getFrame();
+        } catch (\Exception $e) {
+            App::error("publish error=" . (string)$e, $this->module);
+        }
+        return null;
     }
 }

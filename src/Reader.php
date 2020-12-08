@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Rabbit\Nsq;
@@ -23,13 +24,15 @@ class Reader
     /** @var array */
     private array $frame = [];
     private ?float $timeout;
+    private SocketClient $reader;
 
     /**
      * Reader constructor.
      * @param float|null $timeout
      */
-    public function __construct(float $timeout = null)
+    public function __construct(SocketClient $reader, float $timeout = null)
     {
+        $this->reader = $reader;
         $this->timeout = $timeout;
     }
 
@@ -46,13 +49,13 @@ class Reader
      * @return $this
      * @throws Throwable
      */
-    public function bindFrame(SocketClient $reader): self
+    public function bindFrame(): self
     {
         $size = 0;
         $type = 0;
         try {
-            $size = $this->readInt($reader, 4);
-            $type = $this->readInt($reader, 4);
+            $size = $this->readInt(4);
+            $type = $this->readInt(4);
         } catch (Exception $e) {
             throw new Exception("Error reading message frame [$size, $type] ({$e->getMessage()})");
         }
@@ -65,19 +68,19 @@ class Reader
             try {
                 switch ($type) {
                     case self::TYPE_RESPONSE:
-                        $frame['response'] = $this->readString($reader, $size - 4);
+                        $frame['response'] = $this->readString($size - 4);
                         break;
                     case self::TYPE_ERROR:
-                        $frame['error'] = $this->readString($reader, $size - 4);
+                        $frame['error'] = $this->readString($size - 4);
                         break;
                     case self::TYPE_MESSAGE:
-                        $frame['ts'] = $this->readLong($reader);
-                        $frame['attempts'] = $this->readShort($reader);
-                        $frame['id'] = $this->readString($reader, 16);
-                        $frame['payload'] = $this->readString($reader, $size - 30);
+                        $frame['ts'] = $this->readLong();
+                        $frame['attempts'] = $this->readShort();
+                        $frame['id'] = $this->readString(16);
+                        $frame['payload'] = $this->readString($size - 30);
                         break;
                     default:
-                        throw new Exception($this->readString($reader, $size - 4));
+                        throw new Exception($this->readString($size - 4));
                         break;
                 }
             } catch (Exception $e) {
@@ -88,63 +91,27 @@ class Reader
         $this->frame = $frame;
         return $this;
     }
-    // DecodeMessage deserializes data (as []byte) and creates a new Message
-    // message format:
-    //  [x][x][x][x][x][x][x][x][x][x][x][x][x][x][x][x][x][x][x][x][x][x][x][x][x][x][x][x][x][x]...
-    //  |       (int64)        ||    ||      (hex string encoded in ASCII)           || (binary)
-    //  |       8-byte         ||    ||                 16-byte                      || N-byte
-    //  ------------------------------------------------------------------------------------------...
-    //    nanosecond timestamp    ^^                   message ID                       message body
-    //                         (uint16)
-    //                          2-byte
-    //                         attempts
 
-    /**
-     * @param SocketClient $reader
-     * @param int $size
-     * @return string
-     * @throws Exception
-     */
-    private function read(SocketClient $reader, int $size): string
+    private function readShort(): int
     {
-        $data = $reader->recv($size, $this->timeout ?? $reader->getPool()->getTimeout());
-        if (empty($data)) {
-            throw new Exception("recv empty data!");
-        }
-        return $data;
-    }
-
-    /**
-     * @param SocketClient $connection
-     * @return int
-     */
-    private function readShort(SocketClient $connection): int
-    {
-        list(, $res) = unpack('n', $connection->recv(2));
+        list(, $res) = unpack('n', $this->reader->recv(2, $this->timeout ?? $this->reader->getPool()->getTimeout()));
         return $res;
     }
 
-    /**
-     * @param SocketClient $connection
-     * @return int
-     */
-    private function readInt(SocketClient $connection): int
+    private function readInt(): int
     {
-        list(, $res) = unpack('N', $connection->recv(4));
+        list(, $res) = unpack('N', $this->reader->recv(4, $this->timeout ?? $this->reader->getPool()->getTimeout()));
         if ((PHP_INT_SIZE !== 4)) {
             $res = sprintf("%u", $res);
         }
         return (int)$res;
     }
 
-    /**
-     * @param SocketClient $connection
-     * @return string
-     */
-    private function readLong(SocketClient $connection): string
+    private function readLong(): string
     {
-        $hi = unpack('N', $connection->recv(4));
-        $lo = unpack('N', $connection->recv(4));
+        $timeout = $this->timeout ?? $this->reader->getPool()->getTimeout();
+        $hi = unpack('N', $this->reader->recv(4, $timeout));
+        $lo = unpack('N', $this->reader->recv(4, $timeout));
 
         // workaround signed/unsigned braindamage in php
         $hi = sprintf("%u", $hi[1]);
@@ -153,14 +120,9 @@ class Reader
         return bcadd(bcmul($hi, "4294967296"), $lo);
     }
 
-    /**
-     * @param SocketClient $connection
-     * @param int $size
-     * @return string
-     */
-    private function readString(SocketClient $connection, int $size): string
+    private function readString(int $size): string
     {
-        $temp = unpack("c{$size}chars", $connection->recv($size));
+        $temp = unpack("c{$size}chars", $this->reader->recv($size, $this->timeout ?? $this->reader->getPool()->getTimeout()));
         $out = "";
         foreach ($temp as $v) {
             if ($v > 0) {
