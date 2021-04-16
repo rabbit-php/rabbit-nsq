@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Rabbit\Nsq;
 
-use Rabbit\Nsq\Consumer;
-use Rabbit\Nsq\Producer;
 use Rabbit\Pool\BaseManager;
 
 class NsqManager extends BaseManager
