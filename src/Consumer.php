@@ -6,6 +6,7 @@ namespace Rabbit\Nsq;
 
 use Closure;
 use Rabbit\Base\App;
+use Rabbit\Base\Core\LoopControl;
 use Rabbit\Base\Helper\ArrayHelper;
 use Rabbit\Base\Helper\VarDumper;
 use Rabbit\Socket\SocketClient;
@@ -21,11 +22,11 @@ class Consumer extends AbstractNsq
      * @param Closure $callback
      * @throws Throwable
      */
-    public function subscribe(string $topic, string $channel, array $config, Closure $callback, bool &$loop = true): void
+    public function subscribe(string $topic, string $channel, array $config, Closure $callback): ?LoopControl
     {
         try {
             $this->makeTopic($topic, $channel);
-            loop(function () use ($topic, $channel, $config, $callback, &$loop) {
+            return loop(function () use ($topic, $channel, $config, $callback, &$loop) {
                 /** @var ConsumerClient $connection */
                 $connection = $this->pool->get();
                 $this->pool->sub();
@@ -36,11 +37,7 @@ class Consumer extends AbstractNsq
                         break;
                     }
                 }
-                usleep((int)($this->sleep * 1000000));
-                if (!$loop) {
-                    loopStop("$topic:$channel");
-                }
-            }, "$topic:$channel");
+            }, $this->sleep);
         } catch (Throwable $e) {
             App::error("subscribe error=" . (string)$e, $this->module);
         }

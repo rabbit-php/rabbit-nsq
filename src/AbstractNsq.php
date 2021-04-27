@@ -16,7 +16,7 @@ abstract class AbstractNsq extends BaseObject
     protected string $module = 'nsq';
     protected string $dsnd;
     protected static array $created = [];
-    protected float $sleep = 0.5;
+    protected int $sleep = 500;
 
     public function __construct(string $dsnd, ConnectionPool $pool)
     {
