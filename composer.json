@@ -3,7 +3,7 @@
   "description": "rabbit nsq",
   "type": "library",
   "require": {
-    "php": ">=7.4.0",
+    "php": ">=8.1.0",
     "rabbit/httpclient": "dev-master",
     "rabbit/base": "dev-master",
     "rabbit/parser": "dev-master",
