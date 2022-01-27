@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Rabbit\Nsq;
@@ -64,7 +65,7 @@ class Writer
     {
         $cmd = self::command("MPUB", $topic);
         $num = IntPacker::uInt32(count($bodies), true);
-        $mb = implode(array_map(function ($body) {
+        $mb = implode(array_map(function (string $body): string {
             return IntPacker::uint32(strlen($body), true) . $body;
         }, $bodies));
         $size = IntPacker::uInt32(strlen($num . $mb), true);

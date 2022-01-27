@@ -26,7 +26,7 @@ class Consumer extends AbstractNsq
     {
         try {
             $this->makeTopic($topic, $channel);
-            return loop(function () use ($topic, $channel, $config, $callback, &$loop) {
+            return loop(function () use ($topic, $channel, $config, $callback, &$loop): void {
                 /** @var ConsumerClient $connection */
                 $connection = $this->pool->get();
                 $this->pool->sub();
@@ -62,7 +62,7 @@ class Consumer extends AbstractNsq
             $connection->send(Writer::nop());
         } elseif ($reader->isMessage()) {
             $msg = $reader->getFrame();
-            rgo(function () use ($connection, $config, $callback, &$msg) {
+            rgo(function () use ($connection, $config, $callback, &$msg): void {
                 try {
                     call_user_func($callback, $msg);
                 } catch (Throwable $e) {
