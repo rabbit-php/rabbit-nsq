@@ -31,20 +31,20 @@ class MakeNsqConnection
         array $pool
     ): void {
         /** @var NsqManager $manager */
-        $manager = getDI('nsq');
+        $manager = service('nsq');
         if (!$manager->has($name)) {
             switch ($type) {
                 case 'consumer':
                     $conn = [
                         $name => [
                             'consumer' => create([
-                                'class' => Consumer::class,
+                                '{}' => Consumer::class,
                                 'dsnd' => $dsnd,
                                 'pool' => create([
-                                    'class' => SocketPool::class,
+                                    '{}' => SocketPool::class,
                                     'client' => ConsumerClient::class,
                                     'poolConfig' => create([
-                                        'class' => SocketConfig::class,
+                                        '{}' => SocketConfig::class,
                                         'minActive' => $pool['min'],
                                         'maxActive' => $pool['max'],
                                         'maxWait' => $pool['wait'],
@@ -62,12 +62,12 @@ class MakeNsqConnection
                         $name => [
                             'consumer' => null,
                             'producer' => create([
-                                'class' => Producer::class,
+                                '{}' => Producer::class,
                                 'pool' => create([
-                                    'class' => SocketPool::class,
+                                    '{}' => SocketPool::class,
                                     'client' => ProducerClient::class,
                                     'poolConfig' => create([
-                                        'class' => SocketConfig::class,
+                                        '{}' => SocketConfig::class,
                                         'minActive' => $pool['min'],
                                         'maxActive' => $pool['max'],
                                         'maxWait' => $pool['wait'],
@@ -83,13 +83,13 @@ class MakeNsqConnection
                     $conn = [
                         $name => [
                             'consumer' => create([
-                                'class' => Consumer::class,
+                                '{}' => Consumer::class,
                                 'dsnd' => $dsnd,
                                 'pool' => create([
-                                    'class' => SocketPool::class,
+                                    '{}' => SocketPool::class,
                                     'client' => ConsumerClient::class,
                                     'poolConfig' => create([
-                                        'class' => SocketConfig::class,
+                                        '{}' => SocketConfig::class,
                                         'minActive' => $pool['min'],
                                         'maxActive' => $pool['max'],
                                         'maxWait' => $pool['wait'],
@@ -99,12 +99,12 @@ class MakeNsqConnection
                                 ], [], false)
                             ], [], false),
                             'producer' => create([
-                                'class' => Producer::class,
+                                '{}' => Producer::class,
                                 'pool' => create([
-                                    'class' => SocketPool::class,
+                                    '{}' => SocketPool::class,
                                     'client' => ProducerClient::class,
                                     'poolConfig' => create([
-                                        'class' => SocketConfig::class,
+                                        '{}' => SocketConfig::class,
                                         'minActive' => $pool['min'],
                                         'maxActive' => $pool['max'],
                                         'maxWait' => $pool['wait'],
